@@ -17,29 +17,24 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. THE ULTIMATE DARK MODE FIX CSS ---
+# --- 2. FORCED BLACK HEADING CSS ---
 st.markdown("""
     <style>
-    /* Force main background to be neutral */
+    /* Main Background */
     .stApp { background-color: #f8fafc; }
 
-    /* HEADING FIX: High-Priority Discrepancy Heading */
-    h2, h3, .main-title {
-        color: #1e293b !important;
+    /* FORCE ALL HEADINGS TO BLACK */
+    h1, h2, h3, h4, h5, h6, .main-title {
+        color: #000000 !important;
+        font-weight: 800 !important;
     }
     
-    /* If the browser is in dark mode, ensure headings are visible against dark bg */
-    @media (prefers-color-scheme: dark) {
-        h2, h3, .main-title {
-            color: #f8fafc !important;
-        }
-        /* Keep High Priority Discrepancy text visible if container is dark */
-        #high-priority-discrepancies {
-            color: #ffffff !important;
-        }
+    /* Target Streamlit's internal header classes */
+    .st-emotion-cache-10trblm, .st-emotion-cache-12w0qpk {
+        color: #000000 !important;
     }
 
-    /* SUMMARY BOX FIX: Forced Visibility */
+    /* SUMMARY BOX VISIBILITY */
     [data-testid="stMetric"] {
         background: #ffffff !important;
         padding: 15px 20px;
@@ -49,11 +44,10 @@ st.markdown("""
     }
     [data-testid="stMetricLabel"] > div, 
     [data-testid="stMetricValue"] > div {
-        color: #1e293b !important; /* Dark slate text */
+        color: #000000 !important; /* Force black numbers/labels */
     }
 
-    /* ACCORDION/EXPANDER HEADER FIX */
-    /* Target the container */
+    /* EXPANDER (ACCORDION) STYLING */
     div[data-testid="stExpander"] {
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
@@ -61,35 +55,33 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* Target the clickable header text (Summary) */
+    /* Expander Header: Dark background with White Text for contrast */
     div[data-testid="stExpander"] summary {
-        background-color: #262730 !important; /* Dark header bar */
+        background-color: #000000 !important; 
         border-radius: 12px 12px 0 0 !important;
         padding: 5px !important;
     }
 
-    /* FORCE HEADER TEXT VISIBILITY */
     div[data-testid="stExpander"] summary p {
-        color: #ffffff !important; /* Force text to be WHITE on the DARK header bar */
+        color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 1rem !important;
     }
 
-    /* Target the expansion arrow to be white */
+    /* Expander Arrow Color */
     div[data-testid="stExpander"] summary svg {
         fill: #ffffff !important;
     }
     
-    /* ACCORDION CONTENT FIX */
+    /* Expander Inner Body Text */
     div[data-testid="stExpander"] .stMarkdown, 
     div[data-testid="stExpander"] p, 
     div[data-testid="stExpander"] li {
-        color: #1e293b !important; /* Dark text inside the WHITE body */
+        color: #000000 !important;
     }
 
-    /* Search Bar Input Visibility */
+    /* Search Bar and Tables */
     .stTextInput input {
-        color: #1e293b !important;
+        color: #000000 !important;
         background-color: #ffffff !important;
     }
 
@@ -97,7 +89,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. DATA FETCHING (CACHED) ---
+# --- 3. DATA FETCHING ---
 def get_now_ist():
     return datetime.now(IST).replace(tzinfo=None)
 
@@ -111,12 +103,12 @@ def fetch_live_data():
     except:
         return []
 
-# --- 4. CORE ENGINE ---
+# --- 4. AUDIT ENGINE ---
 current_now = get_now_ist()
 live_stages = fetch_live_data()
 
 if not live_stages:
-    st.error("🚨 Connection Error: Unable to sync with servers.")
+    st.error("🚨 Connection Error: Unable to reach KITE servers.")
 else:
     suspicious_list = []
     inventory_list = []
@@ -128,9 +120,12 @@ else:
         errors = []
         name = str(stage.get("name", "Unknown Stage"))
         loc = str(stage.get("location", "Unknown Venue"))
+        
         raw_is_live = stage.get("isLive")
         is_live = str(raw_is_live).lower() == "true" or raw_is_live is True
-        total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
+        
+        total = int(stage.get("participants", 0))
+        done = int(stage.get("completed", 0))
         rem = total - done
         is_finished = str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         tent_time_str = stage.get("tent_time", "")
@@ -140,11 +135,12 @@ else:
         summary["total_p"] += total
         summary["done_p"] += done
 
+        # Core Audits
         if rem > 0:
             if not is_live:
-                errors.append(f"⏸️ Status Paused: Stage is Inactive but {rem} performers are still in the queue.")
+                errors.append(f"⏸️ Status Paused: Stage is Inactive but {rem} pending.")
             if is_finished:
-                errors.append(f"📉 Flow Error: Stage marked 'Finished' while {rem} participants are pending.")
+                errors.append(f"📉 Flow Error: Finished Flag ON but {rem} waiting.")
 
         delay_status = "On Time"
         formatted_date_time = "Not Scheduled"
@@ -160,7 +156,7 @@ else:
                     if late_mins > 0:
                         delay_status = f"🚨 {late_mins} Minutes Late"
                     if late_mins > 10: 
-                        errors.append(f"⏰ Overdue Alert: This stage is running {late_mins} minutes behind schedule.")
+                        errors.append(f"⏰ Overdue Alert: Running {late_mins} minutes behind.")
             except: pass
 
         if errors:
@@ -172,15 +168,15 @@ else:
         inventory_list.append({
             "Stage Name": name,
             "Venue Location": loc,
-            "Current Competition": item_name,
-            "Stage State": "🔴 Live Now" if is_live else ("✅ Finished" if is_finished else "⚪ Inactive"),
-            "Performers Waiting": rem,
-            "Total Load": total,
-            "Estimated Completion": formatted_date_time,
-            "Timing Status": delay_status
+            "Competition": item_name,
+            "Status": "🔴 Live Now" if is_live else ("✅ Finished" if is_finished else "⚪ Inactive"),
+            "Waiting": rem,
+            "Total": total,
+            "Scheduled Finish": formatted_date_time,
+            "Timing": delay_status
         })
 
-    # --- 5. UI LAYOUT ---
+    # --- 5. UI DISPLAY ---
     st.markdown('<h1 class="main-title">Kerala State School Kalolsavam Stage Analysis</h1>', unsafe_allow_html=True)
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
 
@@ -188,13 +184,12 @@ else:
     m1.metric("Active Venues", f"{summary['live']} / {len(live_stages)}")
     m2.metric("Total Participants", summary['total_p'])
     prog_val = int((summary['done_p']/summary['total_p'])*100) if summary['total_p'] > 0 else 0
-    m3.metric("Festival Progress", f"{prog_val}%")
-    m4.metric("Pending Performances", summary['total_p'] - summary['done_p'])
+    m3.metric("Global Progress", f"{prog_val}%")
+    m4.metric("Total Pending", summary['total_p'] - summary['done_p'])
 
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
-        end_display = last_item['time'].strftime("%d %b, %I:%M %p")
-        st.error(f"🏁 **Closing Analysis:** {last_item['name']} ({last_item['item']}) projected to finish at **{end_display}**.")
+        st.error(f"🏁 **Closing Analysis:** {last_item['name']} ({last_item['item']}) finishes at **{last_item['time'].strftime('%d %b, %I:%M %p')}**.")
 
     st.divider()
 
@@ -205,7 +200,6 @@ else:
         st.success("✅ Clean Audit: All stage logic synchronized.")
     else:
         for item in suspicious_list:
-            # The CSS handles the header visibility by making it a dark bar with white text
             with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
                 for e in item['errors']:
                     st.write(f"• {e}")
@@ -219,7 +213,7 @@ else:
     if search_query:
         inventory_df = inventory_df[
             inventory_df['Stage Name'].str.contains(search_query, case=False) | 
-            inventory_df['Current Competition'].str.contains(search_query, case=False)
+            inventory_df['Competition'].str.contains(search_query, case=False)
         ]
 
     st.dataframe(inventory_df, use_container_width=True, hide_index=True)
