@@ -30,17 +30,16 @@ st.markdown("""
     }
     h1 { color: #2c3e50; font-size: 2.2rem !important; }
     .element-container .stAlert { border-radius: 10px; }
-    .stInfo { background-color: #e3f2fd; border: 1px solid #90caf9; color: #0d47a1; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. CONFIGURATION ---
 URL_STAGE = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/stage/Stage_management"
 URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publishresult/Public_result/completedItems"
-GRACE_PERIOD_MINS = 10 
+GRACE_PERIOD = 10 
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule reference (Logic Anchor)
+# Pre-schedule reference
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Bharathanatyam (Boys), Thiruvathira (Girls)", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Nadodi Nrutham (Girls), Oppana (Girls)", "time": "09 30, 14 00"},
@@ -68,22 +67,45 @@ PRE_SCHEDULE = [
 def get_similarity(a, b):
     return difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
-def get_scheduled_item(stage_name, current_time):
+def get_schedule_context(stage_name, current_time):
+    """
+    Returns (current_item, next_item) to handle early starts.
+    """
     sched = next((s for s in PRE_SCHEDULE if s["venue"] == stage_name), None)
-    if not sched: return None, False
+    if not sched: return None, None
+    
     items = [i.strip() for i in sched["item"].split(",")]
     times = [t.strip() for t in sched["time"].split(",")]
+    
     slots = []
     for i in range(len(times)):
         try:
             dt = datetime.strptime(f"{current_time.strftime('%Y-%m-%d')} {times[i].replace(' ', ':')}", "%Y-%m-%d %H:%M")
             slots.append({"item": items[i], "time": dt})
         except: continue
+        
     slots.sort(key=lambda x: x["time"])
-    res_item, in_slot = None, False
-    for slot in slots:
-        if current_time >= slot["time"]: res_item, in_slot = slot["item"], True
-    return res_item, in_slot
+    
+    current_item = None
+    next_item = None
+    
+    # Determine current slot
+    for i, slot in enumerate(slots):
+        if current_time >= slot["time"]:
+            current_item = slot["item"]
+            # Look ahead to see what's next
+            if i + 1 < len(slots):
+                next_item = slots[i+1]["item"]
+            else:
+                next_item = None # Last item of the day
+        else:
+            # If we haven't reached this slot yet, and haven't found a current,
+            # this is the 'upcoming' first item.
+            if current_item is None:
+                next_item = slot["item"]
+            break
+            
+    return current_item, next_item
 
 @st.cache_data(ttl=60)
 def fetch_data():
@@ -108,24 +130,22 @@ def main():
 
     stages, published = fetch_data()
     if not stages:
-        st.error("⚠️ Unable to connect to the festival server.")
+        st.error("⚠️ Unable to connect to the festival server. Please try again later.")
         return
 
     now = datetime.now()
     summary = {"live": 0, "fin": 0, "total_p": 0, "done_p": 0}
     full_data = []
     alerts = []
-    time_overview = []
 
     for s in stages:
-        errors = [] # Temporary errors list for logic engine
-        is_live = s.get("isLive", False)
+        is_live = s.get("isLive")
         code = str(s.get("item_code", ""))
         item_name = s.get("item_name", "Unknown Item")
         total = s.get("participants", 0)
         done = s.get("completed", 0)
         rem = total - done
-        is_fin = s.get("is_tabulation_finish", "N") == "Y"
+        is_fin = s.get("is_tabulation_finish") == "Y"
         
         try: tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
         except: tent = now
@@ -134,43 +154,53 @@ def main():
         status_text = "Live Now 🔴" if is_live else ("Finished ✅" if is_fin else "Waiting ⏸️")
         
         if is_live: summary["live"] += 1
-        else: summary["inactive"] = summary.get("inactive", 0) + 1
         if is_fin: summary["fin"] += 1
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # Logic for Prediction
-        time_overview.append({"name": s['name'], "time": tent, "isLive": is_live})
-
-        # --- SYNCED LOGIC ENGINE ---
-        sched_item, is_in_slot = get_scheduled_item(s['name'], now)
-
-        # 1. Result Conflict
-        if is_live and code in published:
-            errors.append(f"🚨 **PUBLISH CONFLICT:** Item [{code}] is LIVE, but already PUBLISHED.")
-
-        # 2. Status Consistency
-        if done > total: errors.append(f"❌ **DATA ERROR:** Completed ({done}) > Total ({total}).")
-        if rem <= 0 and is_live: errors.append("🧟 **LOGIC:** Stage LIVE but 0 pending.")
+        # --- LOGIC ENGINE ---
+        issues = []
         
-        if rem > 0:
-            if not is_live: errors.append(f"⏸️ **LOGIC:** Stage INACTIVE but {rem} pending.")
-            if is_fin: errors.append(f"📉 **LOGIC:** Finished Flag ON but {rem} waiting.")
+        # 1. Lookahead Schedule Matching
+        curr_sched, next_sched = get_schedule_context(s['name'], now)
         
-        # 3. Time Validation (Critical Fix: Sync with Terminal Script)
-        if is_live and late_mins > 0:
-            if late_mins > GRACE_PERIOD_MINS:
-                errors.append(f"⏰ **TIME CRITICAL:** Stage is {late_mins} minutes behind tent_time.")
+        if is_live and curr_sched:
+            # Check against Current Slot
+            match_curr = get_similarity(curr_sched, item_name) >= SIMILARITY_THRESHOLD or curr_sched.lower() in item_name.lower()
+            # Check against Next Slot (Early Start)
+            match_next = False
+            if next_sched:
+                match_next = get_similarity(next_sched, item_name) >= SIMILARITY_THRESHOLD or next_sched.lower() in item_name.lower()
+            
+            # If neither matches, flag error
+            if not match_curr and not match_next:
+                expect_msg = f"'{curr_sched}'"
+                if next_sched: expect_msg += f" or '{next_sched}'"
+                issues.append(f"🔀 **MISMATCH:** Expected {expect_msg}, Live shows '{item_name}'.")
+
+        # 2. Inactive but Pending (FIXED Logic)
+        if rem > 0 and not is_live:
+            if late_mins > 0:
+                issues.append(f"🔴 **CRITICAL:** Stage is OFF but overdue by {late_mins} mins.")
+            elif done > 0:
+                issues.append(f"⏸️ **PAUSED:** {done} finished, stopped with {rem} pending.")
             else:
-                errors.append(f"🟡 **TIME WARNING:** Stage starting to lag ({late_mins} mins behind).")
+                issues.append("⏳ **WAITING:** Item has not started yet.")
 
-        # 4. Item Mismatch (Corrected condition)
-        if is_in_slot and sched_item:
-            if get_similarity(sched_item, item_name) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_name.lower():
-                errors.append(f"🔀 **MISMATCH:** Expected '{sched_item}', Live shows '{item_name}'.")
+        # 3. Published Results Conflict
+        if is_live and code in published:
+            issues.append(f"🚨 **DATA ERROR:** Results published at {published[code]}, but stage is LIVE.")
 
-        if errors:
-            alerts.append({"stage": s['name'], "loc": s['location'], "issues": errors})
+        # 4. Zombie Live Status
+        if rem <= 0 and is_live:
+            issues.append("🧟 **STUCK STATUS:** All participants finished, but stage shows Live.")
+
+        # 5. Live Lags
+        if is_live and late_mins > GRACE_PERIOD:
+            issues.append(f"⏰ **LAGGING:** Running {late_mins} min behind schedule.")
+
+        if issues:
+            alerts.append({"stage": s['name'], "loc": s['location'], "issues": issues})
 
         full_data.append({
             "Stage": s['name'],
@@ -178,35 +208,33 @@ def main():
             "Status": status_text,
             "Remaining": rem,
             "Expected End": tent.strftime("%I:%M %p"),
-            "Delay": max(0, late_mins) if is_live else 0,
+            "Delay (min)": max(0, late_mins) if is_live else 0,
             "Search_Key": f"{s['name']} {item_name} {code}".lower()
         })
 
-    # --- TOP METRICS ---
-    progress = int((summary["done_p"]/summary["total_p"])*100) if summary["total_p"] > 0 else 0
+    # --- METRICS ---
+    if summary["total_p"] > 0:
+        progress = int((summary["done_p"] / summary["total_p"]) * 100)
+    else:
+        progress = 0
+
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("🔴 Stages Live", summary["live"])
     m2.metric("✅ Items Done", summary["fin"])
     m3.metric("📊 Total Progress", f"{progress}%")
     m4.metric("👥 Participants Left", summary["total_p"] - summary["done_p"])
 
-    # --- LAST STAGE PREDICTION ---
-    if time_overview:
-        time_overview.sort(key=lambda x: x["time"], reverse=True)
-        latest_stage = time_overview[0]
-        st.info(f"🕒 **Projected Last Finish:** {latest_stage['name']} is expected to end at **{latest_stage['time'].strftime('%I:%M %p')}**")
-
     st.divider()
 
     # --- ALERTS ---
     if alerts:
-        with st.expander("⚠️ System Alerts & Discrepancies (Click to View)", expanded=True):
+        with st.expander("⚠️ System Alerts & Delays (Click to View)", expanded=True):
             for alert in alerts:
                 st.warning(f"**{alert['stage']}** ({alert['loc']})\n\n" + "\n".join(alert['issues']))
 
     # --- TABLE ---
     st.subheader("🔍 Find Your Stage")
-    search_query = st.text_input("", placeholder="Search Stage or Item...").lower()
+    search_query = st.text_input("", placeholder="Search Stage (e.g., 'Stage 5') or Item...").lower()
     
     df = pd.DataFrame(full_data)
     if not df.empty:
@@ -220,11 +248,11 @@ def main():
             height=int(len(df) * 35.5) + 38,
             column_config={
                 "Status": st.column_config.TextColumn("Status", width="small"),
-                "Delay": st.column_config.ProgressColumn("Delay (m)", format="%d", min_value=0, max_value=60),
+                "Delay (min)": st.column_config.ProgressColumn("Delay", format="%d min", min_value=0, max_value=60),
             }
         )
     else:
-        st.info("No data available.")
+        st.info("No stage data available.")
 
 if __name__ == "__main__":
     main()
