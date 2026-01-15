@@ -146,7 +146,7 @@ if live_stages:
     m2.metric("Finished Stages", summary["fin"])
     progress = int((summary["t_c"]/summary["t_p"])*100) if summary["t_p"]>0 else 0
     m3.metric("Overall Progress", f"{progress}%")
-    m4.metric("Pending", summary["t_p"] - summary["t_c"])
+    m4.metric("Pending Participants", summary["t_p"] - summary["t_c"])
 
     # Time Analysis
     if time_overview:
