@@ -17,7 +17,7 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. FORCED BLACK HEADING CSS ---
+# --- 2. FORCED BLACK HEADING & UI CSS ---
 st.markdown("""
     <style>
     /* Main Background */
@@ -29,11 +29,6 @@ st.markdown("""
         font-weight: 800 !important;
     }
     
-    /* Target Streamlit's internal header classes */
-    .st-emotion-cache-10trblm, .st-emotion-cache-12w0qpk {
-        color: #000000 !important;
-    }
-
     /* SUMMARY BOX VISIBILITY */
     [data-testid="stMetric"] {
         background: #ffffff !important;
@@ -44,7 +39,7 @@ st.markdown("""
     }
     [data-testid="stMetricLabel"] > div, 
     [data-testid="stMetricValue"] > div {
-        color: #000000 !important; /* Force black numbers/labels */
+        color: #000000 !important;
     }
 
     /* EXPANDER (ACCORDION) STYLING */
@@ -55,7 +50,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* Expander Header: Dark background with White Text for contrast */
+    /* Expander Header: Solid Black with White Text */
     div[data-testid="stExpander"] summary {
         background-color: #000000 !important; 
         border-radius: 12px 12px 0 0 !important;
@@ -67,12 +62,11 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* Expander Arrow Color */
     div[data-testid="stExpander"] summary svg {
         fill: #ffffff !important;
     }
     
-    /* Expander Inner Body Text */
+    /* Expander Body Text */
     div[data-testid="stExpander"] .stMarkdown, 
     div[data-testid="stExpander"] p, 
     div[data-testid="stExpander"] li {
@@ -135,7 +129,7 @@ else:
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # Core Audits
+        # Audits
         if rem > 0:
             if not is_live:
                 errors.append(f"⏸️ Status Paused: Stage is Inactive but {rem} pending.")
@@ -184,7 +178,7 @@ else:
     m1.metric("Active Venues", f"{summary['live']} / {len(live_stages)}")
     m2.metric("Total Participants", summary['total_p'])
     prog_val = int((summary['done_p']/summary['total_p'])*100) if summary['total_p'] > 0 else 0
-    m3.metric("Global Progress", f"{prog_val}%")
+    m3.metric("Completion Progress", f"{prog_val}%")
     m4.metric("Total Pending Participants", summary['total_p'] - summary['done_p'])
 
     if time_tracker:
@@ -193,27 +187,38 @@ else:
 
     st.divider()
 
-    # ALERTS SECTION
-    st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
-    
-    if not suspicious_list:
-        st.success("✅ Clean Audit: All stage logic synchronized.")
-    else:
-        for item in suspicious_list:
-            with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
-                for e in item['errors']:
-                    st.write(f"• {e}")
-                st.caption(f"Location: {item['loc']}")
+    col_left, col_right = st.columns([1, 2])
 
-    st.divider()
-    st.subheader("📊 Detailed Stage Inventory")
-    search_query = st.text_input("🔍 Search Stage or Item:")
-    
-    inventory_df = pd.DataFrame(inventory_list)
-    if search_query:
-        inventory_df = inventory_df[
-            inventory_df['Stage Name'].str.contains(search_query, case=False) | 
-            inventory_df['Competition'].str.contains(search_query, case=False)
-        ]
+    with col_left:
+        st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
+        if not suspicious_list:
+            st.success("✅ Clean Audit: All stage logic synchronized.")
+        else:
+            for item in suspicious_list:
+                with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
+                    for e in item['errors']:
+                        st.write(f"• {e}")
+                    st.caption(f"Location: {item['loc']}")
 
-    st.dataframe(inventory_df, use_container_width=True, hide_index=True)
+    with col_right:
+        st.subheader("📊 Detailed Stage Inventory")
+        search_query = st.text_input("🔍 Search Stage or Item:")
+        
+        inventory_df = pd.DataFrame(inventory_list)
+        if search_query:
+            inventory_df = inventory_df[
+                inventory_df['Stage Name'].str.contains(search_query, case=False) | 
+                inventory_df['Competition'].str.contains(search_query, case=False)
+            ]
+
+        # DYNAMIC HEIGHT CALCULATION: Row height (35.5) * count + header (45)
+        full_table_height = (len(inventory_df) * 35.5) + 45
+
+        st.dataframe(
+            inventory_df, 
+            use_container_width=True, 
+            hide_index=True,
+            height=int(full_table_height)
+        )
+
+    st.caption("Verification Engine V2.6. IST-Sync Enabled.")
