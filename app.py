@@ -185,7 +185,7 @@ else:
     m2.metric("Total Participants", summary['total_p'])
     prog_val = int((summary['done_p']/summary['total_p'])*100) if summary['total_p'] > 0 else 0
     m3.metric("Global Progress", f"{prog_val}%")
-    m4.metric("Total Pending", summary['total_p'] - summary['done_p'])
+    m4.metric("Total Pending Participants", summary['total_p'] - summary['done_p'])
 
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
