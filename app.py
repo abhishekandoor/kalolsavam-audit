@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pytz
 
 # --- 1. PAGE & STYLE CONFIG ---
-st.set_page_config(page_title="Kalolsavam Audit | Command Center", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Kalolsavam Audit | Control Room", page_icon="⚖️", layout="wide")
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -29,7 +29,10 @@ st.markdown("""
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
     }
-    /* Remove unnecessary padding */
+    /* Search Input Styling */
+    .stTextInput > div > div > input {
+        border-radius: 10px;
+    }
     .block-container { padding-top: 2rem; }
     </style>
 """, unsafe_allow_html=True)
@@ -56,7 +59,7 @@ if not live_stages:
     st.error("🚨 Connection Error: Unable to reach the KITE portal.")
 else:
     suspicious_list = []
-    inventory_data = []
+    inventory_list = []
     time_tracker = []
     
     summary = {"live": 0, "total_p": 0, "done_p": 0}
@@ -78,15 +81,16 @@ else:
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # 1. Logic Audit (The Stage 16 Checks)
+        # 1. Logic Audit
         if rem > 0:
             if not is_live:
                 errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} participants are pending.")
             if is_finished:
                 errors.append(f"📉 LOGIC: Marked 'Finished' but {rem} waiting.")
 
-        # 2. Time Audit (The Stage 2 Checks)
+        # 2. Time Audit
         late_mins = 0
+        delay_text = "On Time"
         if tent_time_str:
             try:
                 tent_time = datetime.strptime(tent_time_str, "%Y-%m-%d %H:%M:%S")
@@ -94,53 +98,50 @@ else:
                 
                 if rem > 0 and current_now > tent_time:
                     late_mins = int((current_now - tent_time).total_seconds() / 60)
-                    if late_mins > 10: # Grace period
-                        errors.append(f"⏰ CRITICAL: System is {late_mins} mins behind schedule.")
+                    if late_mins > 0:
+                        delay_text = f"🚨 {late_mins} Minutes Late"
+                    if late_mins > 10: 
+                        errors.append(f"⏰ CRITICAL: Stage is {late_mins} mins behind schedule.")
             except: pass
 
         if errors:
             suspicious_list.append({
-                "name": name, 
-                "loc": loc, 
-                "item": item_name,
-                "errors": errors, 
-                "rem": rem
+                "name": name, "loc": loc, "item": item_name,
+                "errors": errors, "rem": rem
             })
 
-        inventory_data.append({
-            "Stage": name,
-            "Item": item_name,
-            "Status": "🟢 LIVE" if is_live else "⚪ OFF",
-            "Rem": rem,
-            "Est. Finish": tent_time_str.split(" ")[1] if " " in tent_time_str else "N/A",
-            "Lag (m)": late_mins if late_mins > 0 else "-"
+        # --- PREPARE FRIENDLY INVENTORY DATA ---
+        inventory_list.append({
+            "Stage Name": name,
+            "Venue Location": loc,
+            "Active Competition": item_name,
+            "Current Status": "🔴 Live Now" if is_live else ("✅ Finished" if is_finished else "⚪ Waiting"),
+            "Participants Waiting": rem,
+            "Total Participants": total,
+            "Scheduled End": tent_time_str.split(" ")[1] if " " in tent_time_str else "N/A",
+            "Delay Status": delay_text
         })
 
     # --- 4. TOP SUMMARY DASHBOARD ---
-    col_t1, col_t2 = st.columns([2, 1])
-    with col_t1:
-        st.title("🏛️ Master Audit Control Room")
-    with col_t2:
-        st.info(f"🕒 **Last Sync:** {current_now.strftime('%I:%M:%S %p')}")
+    st.title("🏛️ Master Audit Command Center")
+    st.info(f"🕒 **Current System Time:** {current_now.strftime('%I:%M:%S %p')} IST | **Data Source:** KITE Kerala Servers")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Live Venues", f"{summary['live']} / {len(live_stages)}")
-    m2.metric("Total Participants", summary['total_p'])
+    m1.metric("Stages Currently Live", f"{summary['live']} / {len(live_stages)}")
+    m2.metric("Total Event Participants", summary['total_p'])
     prog_val = int((summary['done_p']/summary['total_p'])*100) if summary['total_p'] > 0 else 0
-    m3.metric("Global Progress", f"{prog_val}%")
-    m4.metric("Pending Total", summary['total_p'] - summary['done_p'])
+    m3.metric("Overall Festival Progress", f"{prog_val}%")
+    m4.metric("Total Pending Performances", summary['total_p'] - summary['done_p'])
 
-    # --- 5. LAST EXPECTED STAGE (Projected Completion) ---
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
         day_str = "Today" if last_item['time'].date() == current_now.date() else "Tomorrow"
-        
-        st.error(f"🏁 **Projected Closing Item:** {last_item['name']} is expected to finish the day with **{last_item['item']}** at **{last_item['time'].strftime('%I:%M %p')}** ({day_str})")
+        st.error(f"🏁 **Projected Final Performance:** {last_item['name']} ({last_item['item']}) at **{last_item['time'].strftime('%I:%M %p')}** ({day_str})")
 
     st.divider()
 
-    # --- 6. CRITICAL ALERTS & STAGE DETAILS ---
-    col_left, col_right = st.columns([1, 1])
+    # --- 5. CRITICAL ALERTS & DETAILED INVENTORY ---
+    col_left, col_right = st.columns([1, 2])
     
     with col_left:
         st.subheader(f"🚩 Critical Discrepancies ({len(suspicious_list)})")
@@ -148,29 +149,40 @@ else:
             st.success("✅ Clean Audit: All venues logically consistent.")
         else:
             for item in suspicious_list:
-                # UPDATED: Expander title now includes the Item Name for better visibility
-                with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Pending)", expanded=True):
+                with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
                     for e in item['errors']:
                         st.markdown(f"**{e}**")
-                    st.caption(f"Location: {item['loc']}")
+                    st.caption(f"Venue: {item['loc']}")
 
     with col_right:
-        st.subheader("📊 Real-Time Inventory")
-        df = pd.DataFrame(inventory_data)
+        st.subheader("📊 Full Stage Inventory")
         
-        # Calculate height to remove inner scroll
-        table_height = (len(df) * 35.5) + 40 
+        # User-Friendly Search
+        search_query = st.text_input("🔍 Search for a specific Stage or Art Form:", placeholder="e.g. Stage 5, Oppana, Drama...")
+        
+        # Filter Data based on search
+        inventory_df = pd.DataFrame(inventory_list)
+        if search_query:
+            inventory_df = inventory_df[
+                inventory_df['Stage Name'].str.contains(search_query, case=False) | 
+                inventory_df['Active Competition'].str.contains(search_query, case=False) |
+                inventory_df['Venue Location'].str.contains(search_query, case=False)
+            ]
+
+        # Calculate height dynamically to prevent inner scroll
+        table_height = (len(inventory_df) * 35.5) + 45
         
         st.dataframe(
-            df,
+            inventory_df,
             use_container_width=True,
             hide_index=True,
             height=int(table_height),
             column_config={
-                "Lag (m)": st.column_config.TextColumn("Delay", help="Minutes behind tentative finish time"),
-                "Status": st.column_config.TextColumn("State"),
-                "Est. Finish": st.column_config.TextColumn("Scheduled")
+                "Delay Status": st.column_config.TextColumn("Delay Info"),
+                "Scheduled End": st.column_config.TextColumn("Tentative End"),
+                "Current Status": st.column_config.TextColumn("State"),
+                "Participants Waiting": st.column_config.NumberColumn("Waitlist")
             }
         )
 
-    st.caption("Verification against dynamic server variables. Protocol: IST-Sync Enabled.")
+    st.caption("Protocol: Verification against real-time server variables. IST-Sync Enabled.")
