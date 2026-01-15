@@ -17,51 +17,59 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. THEME & VISIBILITY CSS ---
+# --- 2. FIXED THEME & VISIBILITY CSS ---
 st.markdown("""
     <style>
     /* Main Background */
-    .main { background-color: #f8fafc; }
+    .stApp { background-color: #f8fafc; }
     
     /* Heading Styling */
     .main-title {
-        color: #1e293b;
+        color: #1e293b !important;
         font-weight: 800;
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
+        font-size: 2.2rem;
+        margin-bottom: 1rem;
     }
 
-    /* Metric Card Styling */
+    /* FIX: Summary Metrics Visibility */
     [data-testid="stMetric"] {
-        background: white;
+        background: #ffffff !important;
         padding: 15px 20px;
         border-radius: 15px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #f0f2f6;
+        border: 1px solid #e2e8f0;
+    }
+    /* Force Metric Label and Value to be Dark */
+    [data-testid="stMetricLabel"] > div, 
+    [data-testid="stMetricValue"] > div {
+        color: #1e293b !important;
     }
 
-    /* FIX: Expander Visibility in Dark Mode */
+    /* FIX: Expander Header Visibility */
     div[data-testid="stExpander"] {
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
-        background-color: #ffffff !important; /* Force White Background */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        color: #1e293b !important; /* Force Dark Text */
+        background-color: #ffffff !important;
+        margin-bottom: 10px;
     }
-
-    /* Ensure all text inside expanders (markdown, text, labels) is visible */
+    /* Specifically target the clickable header text */
+    div[data-testid="stExpander"] summary p {
+        color: #1e293b !important;
+        font-weight: 600 !important;
+    }
+    
+    /* FIX: Expander Inner Content */
     div[data-testid="stExpander"] .stMarkdown, 
     div[data-testid="stExpander"] p, 
-    div[data-testid="stExpander"] label,
-    div[data-testid="stExpander"] span {
-        color: #1e293b !important;
+    div[data-testid="stExpander"] li {
+        color: #334155 !important;
     }
 
     /* Alert Styling */
     .stAlert { border-radius: 12px; }
 
     /* Search Bar Styling */
-    .stTextInput > div > div > input { border-radius: 10px; }
+    .stTextInput > div > div > input { border-radius: 10px; color: #1e293b !important; }
 
     .block-container { padding-top: 2rem; }
     </style>
@@ -113,14 +121,12 @@ else:
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # Logic Audit
         if rem > 0:
             if not is_live:
                 errors.append(f"⏸️ Status Paused: Stage is Inactive but {rem} performers are still in the queue.")
             if is_finished:
                 errors.append(f"📉 Flow Error: Stage marked 'Finished' while {rem} participants are pending.")
 
-        # Time Audit
         delay_status = "On Time"
         formatted_date_time = "Not Scheduled"
         
@@ -182,7 +188,6 @@ else:
             st.success("✅ Clean Audit: All stage logic synchronized.")
         else:
             for item in suspicious_list:
-                # The CSS above ensures the text inside this expander is always dark and visible
                 with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
                     for e in item['errors']:
                         st.write(f"• {e}")
