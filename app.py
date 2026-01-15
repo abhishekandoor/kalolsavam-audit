@@ -20,7 +20,7 @@ st.markdown("""
         background: white;
         padding: 15px 20px;
         border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         border: 1px solid #f0f2f6;
     }
     /* Expander Styling */
@@ -95,11 +95,17 @@ else:
                 if rem > 0 and current_now > tent_time:
                     late_mins = int((current_now - tent_time).total_seconds() / 60)
                     if late_mins > 10: # Grace period
-                        errors.append(f"⏰ CRITICAL: Stage is {late_mins} mins behind schedule.")
+                        errors.append(f"⏰ CRITICAL: System is {late_mins} mins behind schedule.")
             except: pass
 
         if errors:
-            suspicious_list.append({"name": name, "loc": loc, "errors": errors, "rem": rem})
+            suspicious_list.append({
+                "name": name, 
+                "loc": loc, 
+                "item": item_name,
+                "errors": errors, 
+                "rem": rem
+            })
 
         inventory_data.append({
             "Stage": name,
@@ -113,7 +119,7 @@ else:
     # --- 4. TOP SUMMARY DASHBOARD ---
     col_t1, col_t2 = st.columns([2, 1])
     with col_t1:
-        st.title("🏛️ Kalolsavam 2026 Master Audit")
+        st.title("🏛️ Master Audit Control Room")
     with col_t2:
         st.info(f"🕒 **Last Sync:** {current_now.strftime('%I:%M:%S %p')}")
 
@@ -124,13 +130,12 @@ else:
     m3.metric("Global Progress", f"{prog_val}%")
     m4.metric("Pending Total", summary['total_p'] - summary['done_p'])
 
-    # --- 5. NEW: LAST EXPECTED STAGE (Projected Completion) ---
+    # --- 5. LAST EXPECTED STAGE (Projected Completion) ---
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
-        # Check if it spills into tomorrow
         day_str = "Today" if last_item['time'].date() == current_now.date() else "Tomorrow"
         
-        st.error(f"🏁 **Projected Closing Item:** {last_item['name']} is expected to be the final venue, finishing with **{last_item['item']}** at **{last_item['time'].strftime('%I:%M %p')}** ({day_str})")
+        st.error(f"🏁 **Projected Closing Item:** {last_item['name']} is expected to finish the day with **{last_item['item']}** at **{last_item['time'].strftime('%I:%M %p')}** ({day_str})")
 
     st.divider()
 
@@ -143,22 +148,24 @@ else:
             st.success("✅ Clean Audit: All venues logically consistent.")
         else:
             for item in suspicious_list:
-                with st.expander(f"🔴 {item['name']} — {item['rem']} Pending", expanded=True):
+                # UPDATED: Expander title now includes the Item Name for better visibility
+                with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Pending)", expanded=True):
                     for e in item['errors']:
                         st.markdown(f"**{e}**")
+                    st.caption(f"Location: {item['loc']}")
 
     with col_right:
         st.subheader("📊 Real-Time Inventory")
         df = pd.DataFrame(inventory_data)
         
-        # Calculate height to remove inner scroll: (num_rows * row_height) + header_height
-        table_height = (len(df) * 35) + 40 
+        # Calculate height to remove inner scroll
+        table_height = (len(df) * 35.5) + 40 
         
         st.dataframe(
             df,
             use_container_width=True,
             hide_index=True,
-            height=table_height,
+            height=int(table_height),
             column_config={
                 "Lag (m)": st.column_config.TextColumn("Delay", help="Minutes behind tentative finish time"),
                 "Status": st.column_config.TextColumn("State"),
@@ -166,4 +173,4 @@ else:
             }
         )
 
-    st.caption("Protocol: Verification against dynamic KITE server variables. All times are handled in IST.")
+    st.caption("Verification against dynamic server variables. Protocol: IST-Sync Enabled.")
