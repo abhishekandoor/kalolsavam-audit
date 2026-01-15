@@ -67,45 +67,22 @@ PRE_SCHEDULE = [
 def get_similarity(a, b):
     return difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
-def get_schedule_context(stage_name, current_time):
-    """
-    Returns (current_item, next_item) to handle early starts.
-    """
+def get_scheduled_item(stage_name, current_time):
     sched = next((s for s in PRE_SCHEDULE if s["venue"] == stage_name), None)
-    if not sched: return None, None
-    
+    if not sched: return None, False
     items = [i.strip() for i in sched["item"].split(",")]
     times = [t.strip() for t in sched["time"].split(",")]
-    
     slots = []
     for i in range(len(times)):
         try:
             dt = datetime.strptime(f"{current_time.strftime('%Y-%m-%d')} {times[i].replace(' ', ':')}", "%Y-%m-%d %H:%M")
             slots.append({"item": items[i], "time": dt})
         except: continue
-        
     slots.sort(key=lambda x: x["time"])
-    
-    current_item = None
-    next_item = None
-    
-    # Determine current slot
-    for i, slot in enumerate(slots):
-        if current_time >= slot["time"]:
-            current_item = slot["item"]
-            # Look ahead to see what's next
-            if i + 1 < len(slots):
-                next_item = slots[i+1]["item"]
-            else:
-                next_item = None # Last item of the day
-        else:
-            # If we haven't reached this slot yet, and haven't found a current,
-            # this is the 'upcoming' first item.
-            if current_item is None:
-                next_item = slot["item"]
-            break
-            
-    return current_item, next_item
+    res_item, in_slot = None, False
+    for slot in slots:
+        if current_time >= slot["time"]: res_item, in_slot = slot["item"], True
+    return res_item, in_slot
 
 @st.cache_data(ttl=60)
 def fetch_data():
@@ -130,7 +107,7 @@ def main():
 
     stages, published = fetch_data()
     if not stages:
-        st.error("⚠️ Unable to connect to the festival server. Please try again later.")
+        st.error("⚠️ Unable to connect to the festival server.")
         return
 
     now = datetime.now()
@@ -160,44 +137,38 @@ def main():
 
         # --- LOGIC ENGINE ---
         issues = []
-        
-        # 1. Lookahead Schedule Matching
-        curr_sched, next_sched = get_schedule_context(s['name'], now)
-        
-        if is_live and curr_sched:
-            # Check against Current Slot
-            match_curr = get_similarity(curr_sched, item_name) >= SIMILARITY_THRESHOLD or curr_sched.lower() in item_name.lower()
-            # Check against Next Slot (Early Start)
-            match_next = False
-            if next_sched:
-                match_next = get_similarity(next_sched, item_name) >= SIMILARITY_THRESHOLD or next_sched.lower() in item_name.lower()
-            
-            # If neither matches, flag error
-            if not match_curr and not match_next:
-                expect_msg = f"'{curr_sched}'"
-                if next_sched: expect_msg += f" or '{next_sched}'"
-                issues.append(f"🔀 **MISMATCH:** Expected {expect_msg}, Live shows '{item_name}'.")
+        sched_item, is_in_slot = get_scheduled_item(s['name'], now)
 
-        # 2. Inactive but Pending (FIXED Logic)
-        if rem > 0 and not is_live:
-            if late_mins > 0:
-                issues.append(f"🔴 **CRITICAL:** Stage is OFF but overdue by {late_mins} mins.")
-            elif done > 0:
-                issues.append(f"⏸️ **PAUSED:** {done} finished, stopped with {rem} pending.")
-            else:
-                issues.append("⏳ **WAITING:** Item has not started yet.")
-
-        # 3. Published Results Conflict
+        # 1. Result Conflict
         if is_live and code in published:
-            issues.append(f"🚨 **DATA ERROR:** Results published at {published[code]}, but stage is LIVE.")
+            issues.append(f"🚨 **PUBLISH CONFLICT:** Item [{code}] is LIVE, but already PUBLISHED.")
 
-        # 4. Zombie Live Status
-        if rem <= 0 and is_live:
-            issues.append("🧟 **STUCK STATUS:** All participants finished, but stage shows Live.")
+        # 2. Data Consistency
+        if done > total: 
+            issues.append(f"❌ **DATA ERROR:** Completed ({done}) > Total ({total}).")
+        
+        if rem <= 0 and is_live: 
+            issues.append("🧟 **ZOMBIE LIVE:** Stage LIVE but 0 pending.")
 
-        # 5. Live Lags
-        if is_live and late_mins > GRACE_PERIOD:
-            issues.append(f"⏰ **LAGGING:** Running {late_mins} min behind schedule.")
+        # 3. Inactive & Finished Logic (Mirrors Terminal Script)
+        if rem > 0:
+            if not is_live:
+                issues.append(f"⏸️ **LOGIC:** Stage INACTIVE but {rem} participants pending.")
+            if is_fin: 
+                issues.append(f"📉 **LOGIC:** Finished Flag ON but {rem} participants waiting.")
+
+        # 4. Time Validation (Mirrors Terminal Script)
+        # We now check for ANY lateness > 0 mins, not just Grace Period
+        if is_live and late_mins > 0:
+            if late_mins > GRACE_PERIOD:
+                issues.append(f"⏰ **TIME CRITICAL:** Stage is {late_mins} minutes behind tent_time.")
+            else:
+                issues.append(f"🟡 **TIME WARNING:** Stage starting to lag ({late_mins} mins behind).")
+
+        # 5. Item Mismatch
+        if is_in_slot and sched_item:
+            if get_similarity(sched_item, item_name) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_name.lower():
+                issues.append(f"🔀 **MISMATCH:** Expected '{sched_item}', Live shows '{item_name}'.")
 
         if issues:
             alerts.append({"stage": s['name'], "loc": s['location'], "issues": issues})
