@@ -15,12 +15,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. PUBLIC-FRIENDLY CSS ---
+# --- 2. CSS STYLING ---
 st.markdown("""
     <style>
     html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
-    [data-testid="stTextInput"] input { border-radius: 20px; border: 1px solid #ddd; }
     [data-testid="stMetric"] {
         background: #ffffff;
         padding: 10px;
@@ -40,7 +39,7 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD = 10 
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule for Item Mismatch Logic
+# Pre-schedule reference
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Bharathanatyam (Boys), Thiruvathira (Girls)", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Nadodi Nrutham (Girls), Oppana (Girls)", "time": "09 30, 14 00"},
@@ -76,7 +75,6 @@ def get_scheduled_item(stage_name, current_time):
     slots = []
     for i in range(len(times)):
         try:
-            # Assume strict date matching isn't needed for demo, just time logic
             dt = datetime.strptime(f"{current_time.strftime('%Y-%m-%d')} {times[i].replace(' ', ':')}", "%Y-%m-%d %H:%M")
             slots.append({"item": items[i], "time": dt})
         except: continue
@@ -135,27 +133,18 @@ def main():
         late_mins = int((now - tent).total_seconds() / 60)
         status_text = "Live Now 🔴" if is_live else ("Finished ✅" if is_fin else "Waiting ⏸️")
         
-        # Summary Stats
         if is_live: summary["live"] += 1
         if is_fin: summary["fin"] += 1
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # --- LOGIC ENGINE (All Conditions) ---
+        # --- LOGIC ENGINE ---
         issues = []
+        
+        # 1. Calculate Schedule Match (CRITICAL FIX)
         sched_item, is_in_slot = get_scheduled_item(s['name'], now)
 
-        # 1. Result Published Conflict
-        if is_live and code in published:
-            issues.append(f"🚨 **CONFLICT:** Results published at {published[code]}, but stage is LIVE.")
-
-        # 2. Data Integrity
-        if done > total:
-            issues.append(f"❌ **DATA ERROR:** Completed ({done}) exceeds Total ({total}).")
-
-        # 3. Status Consistency
-        if rem <= 0 and is_live:
-            issues.append("🧟 **ZOMBIE LIVE:** All participants finished, but stage shows Live.")
+        # 2. Inactive but Pending Logic
         if rem > 0 and not is_live:
             if late_mins > 0:
                 issues.append(f"🔴 **CRITICAL:** Stage is OFF but overdue by {late_mins} mins.")
@@ -164,20 +153,27 @@ def main():
             else:
                 issues.append("⏳ **WAITING:** Item has not started yet.")
 
-        # 4. Time Validation
+        # 3. Published Results Conflict
+        if is_live and code in published:
+            issues.append(f"🚨 **DATA ERROR:** Results published at {published[code]}, but stage is LIVE.")
+
+        # 4. Zombie Live Status
+        if rem <= 0 and is_live:
+            issues.append("🧟 **STUCK STATUS:** All participants finished, but stage shows Live.")
+
+        # 5. Live Lags
         if is_live and late_mins > GRACE_PERIOD:
             issues.append(f"⏰ **LAGGING:** Running {late_mins} min behind schedule.")
 
-        # 5. Item Verification (Fuzzy Match)
+        # 6. Item Mismatch (Correctly integrated)
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_name) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_name.lower():
-                issues.append(f"🔀 **MISMATCH:** Schedule expects '{sched_item}', Live shows '{item_name}'.")
+                issues.append(f"🔀 **MISMATCH:** Expected '{sched_item}', Live shows '{item_name}'.")
 
-        # Collect Alerts
         if issues:
             alerts.append({"stage": s['name'], "loc": s['location'], "issues": issues})
 
-        # Add to Table
+        # Add to table
         full_data.append({
             "Stage": s['name'],
             "Item": f"{item_name}",
@@ -188,7 +184,7 @@ def main():
             "Search_Key": f"{s['name']} {item_name} {code}".lower()
         })
 
-    # --- METRICS (Calculated Before Display) ---
+    # --- METRICS ---
     if summary["total_p"] > 0:
         progress = int((summary["done_p"] / summary["total_p"]) * 100)
     else:
@@ -202,14 +198,13 @@ def main():
 
     st.divider()
 
-    # --- ALERTS SECTION ---
+    # --- ALERTS ---
     if alerts:
         with st.expander("⚠️ System Alerts & Delays (Click to View)", expanded=True):
             for alert in alerts:
-                # Joins ALL issues with a newline so multiple errors show up clearly
                 st.warning(f"**{alert['stage']}** ({alert['loc']})\n\n" + "\n".join(alert['issues']))
 
-    # --- SEARCH & TABLE ---
+    # --- TABLE ---
     st.subheader("🔍 Find Your Stage")
     search_query = st.text_input("", placeholder="Search Stage (e.g., 'Stage 5') or Item...").lower()
     
