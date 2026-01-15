@@ -30,6 +30,9 @@ st.markdown("""
     }
     h1 { color: #2c3e50; font-size: 2.2rem !important; }
     .element-container .stAlert { border-radius: 10px; }
+    
+    /* Highlight for the Last Stage Info Box */
+    .stInfo { background-color: #e3f2fd; border: 1px solid #90caf9; color: #0d47a1; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -107,15 +110,17 @@ def main():
 
     stages, published = fetch_data()
     if not stages:
-        st.error("⚠️ Unable to connect to the festival server.")
+        st.error("⚠️ Unable to connect to the festival server. Please try again later.")
         return
 
     now = datetime.now()
     summary = {"live": 0, "fin": 0, "total_p": 0, "done_p": 0}
     full_data = []
     alerts = []
+    time_overview = []  # List to track closing times
 
     for s in stages:
+        # Extract Data
         is_live = s.get("isLive")
         code = str(s.get("item_code", ""))
         item_name = s.get("item_name", "Unknown Item")
@@ -124,8 +129,13 @@ def main():
         rem = total - done
         is_fin = s.get("is_tabulation_finish") == "Y"
         
-        try: tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
-        except: tent = now
+        try: 
+            tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
+        except: 
+            tent = now
+
+        # Add to Time Overview for "Last Stage" analysis
+        time_overview.append({"name": s['name'], "time": tent})
 
         late_mins = int((now - tent).total_seconds() / 60)
         status_text = "Live Now 🔴" if is_live else ("Finished ✅" if is_fin else "Waiting ⏸️")
@@ -158,7 +168,6 @@ def main():
                 issues.append(f"📉 **LOGIC:** Finished Flag ON but {rem} participants waiting.")
 
         # 4. Time Validation (Mirrors Terminal Script)
-        # We now check for ANY lateness > 0 mins, not just Grace Period
         if is_live and late_mins > 0:
             if late_mins > GRACE_PERIOD:
                 issues.append(f"⏰ **TIME CRITICAL:** Stage is {late_mins} minutes behind tent_time.")
@@ -194,6 +203,12 @@ def main():
     m2.metric("✅ Items Done", summary["fin"])
     m3.metric("📊 Total Progress", f"{progress}%")
     m4.metric("👥 Participants Left", summary["total_p"] - summary["done_p"])
+
+    # --- NEW FEATURE: LAST STAGE PREDICTION ---
+    if time_overview:
+        time_overview.sort(key=lambda x: x["time"], reverse=True)
+        latest_stage = time_overview[0]
+        st.info(f"🕒 **Projected Last Finish:** {latest_stage['name']} is expected to end at **{latest_stage['time'].strftime('%I:%M %p')}**")
 
     st.divider()
 
