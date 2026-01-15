@@ -17,21 +17,29 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. FIXED THEME & VISIBILITY CSS ---
+# --- 2. THE ULTIMATE DARK MODE FIX CSS ---
 st.markdown("""
     <style>
-    /* Main Background */
+    /* Force main background to be neutral */
     .stApp { background-color: #f8fafc; }
-    
-    /* Heading Styling */
-    .main-title {
+
+    /* HEADING FIX: High-Priority Discrepancy Heading */
+    h2, h3, .main-title {
         color: #1e293b !important;
-        font-weight: 800;
-        font-size: 2.2rem;
-        margin-bottom: 1rem;
+    }
+    
+    /* If the browser is in dark mode, ensure headings are visible against dark bg */
+    @media (prefers-color-scheme: dark) {
+        h2, h3, .main-title {
+            color: #f8fafc !important;
+        }
+        /* Keep High Priority Discrepancy text visible if container is dark */
+        #high-priority-discrepancies {
+            color: #ffffff !important;
+        }
     }
 
-    /* FIX: Summary Metrics Visibility */
+    /* SUMMARY BOX FIX: Forced Visibility */
     [data-testid="stMetric"] {
         background: #ffffff !important;
         padding: 15px 20px;
@@ -39,37 +47,51 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         border: 1px solid #e2e8f0;
     }
-    /* Force Metric Label and Value to be Dark */
     [data-testid="stMetricLabel"] > div, 
     [data-testid="stMetricValue"] > div {
-        color: #1e293b !important;
+        color: #1e293b !important; /* Dark slate text */
     }
 
-    /* FIX: Expander Header Visibility */
+    /* ACCORDION/EXPANDER HEADER FIX */
+    /* Target the container */
     div[data-testid="stExpander"] {
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
         background-color: #ffffff !important;
         margin-bottom: 10px;
     }
-    /* Specifically target the clickable header text */
+
+    /* Target the clickable header text (Summary) */
+    div[data-testid="stExpander"] summary {
+        background-color: #262730 !important; /* Dark header bar */
+        border-radius: 12px 12px 0 0 !important;
+        padding: 5px !important;
+    }
+
+    /* FORCE HEADER TEXT VISIBILITY */
     div[data-testid="stExpander"] summary p {
-        color: #1e293b !important;
-        font-weight: 600 !important;
+        color: #ffffff !important; /* Force text to be WHITE on the DARK header bar */
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+    }
+
+    /* Target the expansion arrow to be white */
+    div[data-testid="stExpander"] summary svg {
+        fill: #ffffff !important;
     }
     
-    /* FIX: Expander Inner Content */
+    /* ACCORDION CONTENT FIX */
     div[data-testid="stExpander"] .stMarkdown, 
     div[data-testid="stExpander"] p, 
     div[data-testid="stExpander"] li {
-        color: #334155 !important;
+        color: #1e293b !important; /* Dark text inside the WHITE body */
     }
 
-    /* Alert Styling */
-    .stAlert { border-radius: 12px; }
-
-    /* Search Bar Styling */
-    .stTextInput > div > div > input { border-radius: 10px; color: #1e293b !important; }
+    /* Search Bar Input Visibility */
+    .stTextInput input {
+        color: #1e293b !important;
+        background-color: #ffffff !important;
+    }
 
     .block-container { padding-top: 2rem; }
     </style>
@@ -94,7 +116,7 @@ current_now = get_now_ist()
 live_stages = fetch_live_data()
 
 if not live_stages:
-    st.error("🚨 Connection Error: Unable to sync with the KITE Kerala servers.")
+    st.error("🚨 Connection Error: Unable to sync with servers.")
 else:
     suspicious_list = []
     inventory_list = []
@@ -106,12 +128,9 @@ else:
         errors = []
         name = str(stage.get("name", "Unknown Stage"))
         loc = str(stage.get("location", "Unknown Venue"))
-        
         raw_is_live = stage.get("isLive")
         is_live = str(raw_is_live).lower() == "true" or raw_is_live is True
-        
-        total = int(stage.get("participants", 0))
-        done = int(stage.get("completed", 0))
+        total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem = total - done
         is_finished = str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         tent_time_str = stage.get("tent_time", "")
@@ -161,7 +180,7 @@ else:
             "Timing Status": delay_status
         })
 
-    # --- 5. UI LAYOUT: HEADER & SUMMARY ---
+    # --- 5. UI LAYOUT ---
     st.markdown('<h1 class="main-title">Kerala State School Kalolsavam Stage Analysis</h1>', unsafe_allow_html=True)
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
 
@@ -179,42 +198,28 @@ else:
 
     st.divider()
 
-    # --- 6. UI LAYOUT: ALERTS & INVENTORY ---
-    col_left, col_right = st.columns([1, 2])
+    # ALERTS SECTION
+    st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     
-    with col_left:
-        st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
-        if not suspicious_list:
-            st.success("✅ Clean Audit: All stage logic synchronized.")
-        else:
-            for item in suspicious_list:
-                with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
-                    for e in item['errors']:
-                        st.write(f"• {e}")
-                    st.caption(f"Location: {item['loc']}")
+    if not suspicious_list:
+        st.success("✅ Clean Audit: All stage logic synchronized.")
+    else:
+        for item in suspicious_list:
+            # The CSS handles the header visibility by making it a dark bar with white text
+            with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
+                for e in item['errors']:
+                    st.write(f"• {e}")
+                st.caption(f"Location: {item['loc']}")
 
-    with col_right:
-        st.subheader("📊 Detailed Stage Inventory")
-        search_query = st.text_input("🔍 Filter by Stage, Item, or Venue:")
-        
-        inventory_df = pd.DataFrame(inventory_list)
-        if search_query:
-            inventory_df = inventory_df[
-                inventory_df['Stage Name'].str.contains(search_query, case=False) | 
-                inventory_df['Current Competition'].str.contains(search_query, case=False) |
-                inventory_df['Venue Location'].str.contains(search_query, case=False)
-            ]
+    st.divider()
+    st.subheader("📊 Detailed Stage Inventory")
+    search_query = st.text_input("🔍 Search Stage or Item:")
+    
+    inventory_df = pd.DataFrame(inventory_list)
+    if search_query:
+        inventory_df = inventory_df[
+            inventory_df['Stage Name'].str.contains(search_query, case=False) | 
+            inventory_df['Current Competition'].str.contains(search_query, case=False)
+        ]
 
-        dynamic_height = (len(inventory_df) * 35.5) + 45
-        st.dataframe(
-            inventory_df,
-            use_container_width=True,
-            hide_index=True,
-            height=int(dynamic_height),
-            column_config={
-                "Estimated Completion": st.column_config.TextColumn("Date & Time"),
-                "Performers Waiting": st.column_config.NumberColumn("Waitlist"),
-            }
-        )
-
-    st.caption("Verification Engine V2.6. IST-Sync Enabled.")
+    st.dataframe(inventory_df, use_container_width=True, hide_index=True)
