@@ -4,7 +4,7 @@ import re
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
 # --- 1. PAGE SETTINGS ---
@@ -17,9 +17,10 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. PROFESSIONAL CSS STYLING ---
+# --- 2. THEME & VISIBILITY CSS ---
 st.markdown("""
     <style>
+    /* Main Background */
     .main { background-color: #f8fafc; }
     
     /* Heading Styling */
@@ -39,15 +40,24 @@ st.markdown("""
         border: 1px solid #f0f2f6;
     }
 
-    /* Expander / Alert Styling */
+    /* FIX: Expander Visibility in Dark Mode */
     div[data-testid="stExpander"] {
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
-        background-color: white !important;
+        background-color: #ffffff !important; /* Force White Background */
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        color: #1e293b !important; /* Force Dark Text */
     }
 
-    /* Info and Error Box Radius */
+    /* Ensure all text inside expanders (markdown, text, labels) is visible */
+    div[data-testid="stExpander"] .stMarkdown, 
+    div[data-testid="stExpander"] p, 
+    div[data-testid="stExpander"] label,
+    div[data-testid="stExpander"] span {
+        color: #1e293b !important;
+    }
+
+    /* Alert Styling */
     .stAlert { border-radius: 12px; }
 
     /* Search Bar Styling */
@@ -89,7 +99,6 @@ else:
         name = str(stage.get("name", "Unknown Stage"))
         loc = str(stage.get("location", "Unknown Venue"))
         
-        # Raw Status Parsing
         raw_is_live = stage.get("isLive")
         is_live = str(raw_is_live).lower() == "true" or raw_is_live is True
         
@@ -100,29 +109,25 @@ else:
         tent_time_str = stage.get("tent_time", "")
         item_name = stage.get("item_name", "N/A")
 
-        # Global Counters
         if is_live: summary["live"] += 1
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # Logic Audit (Zombie stages and Tabulation Errors)
+        # Logic Audit
         if rem > 0:
             if not is_live:
-                errors.append(f"⏸️ **Status Paused:** Stage is Inactive but {rem} performers are still in the queue.")
+                errors.append(f"⏸️ Status Paused: Stage is Inactive but {rem} performers are still in the queue.")
             if is_finished:
-                errors.append(f"📉 **Flow Error:** Stage marked 'Finished' while {rem} participants are pending.")
+                errors.append(f"📉 Flow Error: Stage marked 'Finished' while {rem} participants are pending.")
 
-        # Time Audit (Date and Latency)
+        # Time Audit
         delay_status = "On Time"
         formatted_date_time = "Not Scheduled"
         
         if tent_time_str:
             try:
-                # Parse server time: 2026-01-15 20:15:00
                 tent_time = datetime.strptime(tent_time_str, "%Y-%m-%d %H:%M:%S")
                 time_tracker.append({"name": name, "item": item_name, "time": tent_time})
-                
-                # Format for public view: 15 Jan, 08:15 PM
                 formatted_date_time = tent_time.strftime("%d %b, %I:%M %p")
                 
                 if rem > 0 and current_now > tent_time:
@@ -130,7 +135,7 @@ else:
                     if late_mins > 0:
                         delay_status = f"🚨 {late_mins} Minutes Late"
                     if late_mins > 10: 
-                        errors.append(f"⏰ **Overdue Alert:** This stage is running {late_mins} minutes behind its estimated schedule.")
+                        errors.append(f"⏰ Overdue Alert: This stage is running {late_mins} minutes behind schedule.")
             except: pass
 
         if errors:
@@ -139,7 +144,6 @@ else:
                 "errors": errors, "rem": rem
             })
 
-        # Build Inventory Row
         inventory_list.append({
             "Stage Name": name,
             "Venue Location": loc,
@@ -148,12 +152,12 @@ else:
             "Performers Waiting": rem,
             "Total Load": total,
             "Estimated Completion": formatted_date_time,
-            "Delay Info": delay_status
+            "Timing Status": delay_status
         })
 
     # --- 5. UI LAYOUT: HEADER & SUMMARY ---
-    st.markdown('<h1 class="main-title">Kerala State School Kalolsavam Stage Status Analysis</h1>', unsafe_allow_html=True)
-    st.info(f"🕒 **Last System Sync:** {current_now.strftime('%d %b %Y, %I:%M:%S %p')} IST | Source: Official KITE Infrastructure")
+    st.markdown('<h1 class="main-title">Kerala State School Kalolsavam Stage Analysis</h1>', unsafe_allow_html=True)
+    st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Active Venues", f"{summary['live']} / {len(live_stages)}")
@@ -162,11 +166,10 @@ else:
     m3.metric("Festival Progress", f"{prog_val}%")
     m4.metric("Pending Performances", summary['total_p'] - summary['done_p'])
 
-    # Projected Closing Banner
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
         end_display = last_item['time'].strftime("%d %b, %I:%M %p")
-        st.error(f"🏁 **Closing Analysis:** {last_item['name']} ({last_item['item']}) is projected to be the final item of the session, finishing at **{end_display}**.")
+        st.error(f"🏁 **Closing Analysis:** {last_item['name']} ({last_item['item']}) projected to finish at **{end_display}**.")
 
     st.divider()
 
@@ -176,19 +179,18 @@ else:
     with col_left:
         st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
         if not suspicious_list:
-            st.success("✅ Clean Audit: All stage logic is currently synchronized.")
+            st.success("✅ Clean Audit: All stage logic synchronized.")
         else:
             for item in suspicious_list:
+                # The CSS above ensures the text inside this expander is always dark and visible
                 with st.expander(f"🔴 {item['name']} : {item['item']} ({item['rem']} Waiting)", expanded=True):
                     for e in item['errors']:
-                        st.write(e)
+                        st.write(f"• {e}")
                     st.caption(f"Location: {item['loc']}")
 
     with col_right:
         st.subheader("📊 Detailed Stage Inventory")
-        
-        # User-Friendly Search Bar
-        search_query = st.text_input("🔍 Filter by Stage, Item, or Venue:", placeholder="e.g. Stage 3, Bharathanatyam, Thrissur...")
+        search_query = st.text_input("🔍 Filter by Stage, Item, or Venue:")
         
         inventory_df = pd.DataFrame(inventory_list)
         if search_query:
@@ -198,23 +200,16 @@ else:
                 inventory_df['Venue Location'].str.contains(search_query, case=False)
             ]
 
-        # Calculate table height to remove inner scroll: (num_rows * row_height) + header_buffer
         dynamic_height = (len(inventory_df) * 35.5) + 45
-        
         st.dataframe(
             inventory_df,
             use_container_width=True,
             hide_index=True,
             height=int(dynamic_height),
             column_config={
-                "Delay Info": st.column_config.TextColumn("Timing Status"),
                 "Estimated Completion": st.column_config.TextColumn("Date & Time"),
-                "Stage State": st.column_config.TextColumn("Current Status"),
                 "Performers Waiting": st.column_config.NumberColumn("Waitlist"),
-                "Total Load": st.column_config.NumberColumn("Total")
             }
         )
 
-    st.caption("Verification Engine V2.6. IST-Sync Enabled. Automatic refresh every 60 seconds.")
-
-# Would you like me to add a 'Critical Path' chart that shows which venues have the longest remaining duration?
+    st.caption("Verification Engine V2.6. IST-Sync Enabled.")
