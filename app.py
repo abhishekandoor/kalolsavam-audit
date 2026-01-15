@@ -3,47 +3,42 @@ import json, re, requests, difflib, pandas as pd
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-# --- 1. PAGE CONFIG & THEME ---
-st.set_page_config(page_title="Kalolsavam Audit | Control Room", page_icon="⚖️", layout="wide")
+# --- 1. PAGE SETTINGS ---
+st.set_page_config(
+    page_title="Kalolsavam Live Status", 
+    page_icon="🎭", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- 2. ADVANCED CSS (Auto-height & High-End Look) ---
+# --- 2. PUBLIC-FRIENDLY CSS ---
 st.markdown("""
     <style>
-    /* Remove white space at top */
-    .block-container { padding-top: 2rem; }
+    /* Clean, modern font */
+    html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
     
-    /* Metric Card Styling */
+    /* Remove default padding for mobile feel */
+    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
+    
+    /* Search Bar Styling */
+    [data-testid="stTextInput"] input { border-radius: 20px; border: 1px solid #ddd; }
+    
+    /* Metric Cards - Clean & Bright */
     [data-testid="stMetric"] {
-        background: white;
-        padding: 15px 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        background: #ffffff;
+        padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         border: 1px solid #f0f2f6;
-    }
-
-    /* Professional Headers */
-    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 800; color: #1e293b; }
-
-    /* Custom Background */
-    .stApp {
-        background-color: #f8fafc;
-    }
-
-    /* Styling for the Expanders to look like high-end cards */
-    div[data-testid="stExpander"] {
-        border-radius: 12px !important;
-        border: 1px solid #e2e8f0 !important;
-        background-color: white !important;
-        margin-bottom: 0.5rem;
+        text-align: center;
     }
     
-    /* Badge styling for manual usage if needed */
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 50px;
-        font-size: 12px;
-        font-weight: bold;
-    }
+    /* Headers */
+    h1 { color: #2c3e50; font-size: 2.2rem !important; }
+    h3 { color: #34495e; font-size: 1.2rem !important; margin-top: 20px; }
+    
+    /* Error/Warning boxes */
+    .element-container .stAlert { border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,9 +47,9 @@ URL_STAGE = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/stage/
 URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publishresult/Public_result/completedItems"
 GRACE_PERIOD = 10 
 
-# --- 4. DATA FETCHING (CACHED) ---
+# --- 4. DATA ENGINE (Fast & Cached) ---
 @st.cache_data(ttl=60)
-def fetch_all_data():
+def fetch_data():
     try:
         s_res = requests.get(URL_STAGE, timeout=10)
         stages = json.loads(re.search(r"const stages = (\[.*?\]);", s_res.text, re.S).group(1))
@@ -65,131 +60,119 @@ def fetch_all_data():
         return stages, published
     except: return [], {}
 
-# --- 5. MAIN LOGIC ---
+# --- 5. MAIN APP ---
 def main():
-    # Header Section
-    col_h1, col_h2 = st.columns([3, 1])
-    with col_h1:
-        st.title("🏛️ Kalolsavam 2026 Audit Control Room")
-        st.caption(f"Refreshed: {datetime.now().strftime('%I:%M:%S %p')} | Logic Protocol: V2.4.1")
-    with col_h2:
-        if st.button('🔄 Manual Refresh', use_container_width=True):
-            st.rerun()
+    # --- HEADER ---
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.title("🎭 Kalolsavam Live Status")
+        st.caption(f"Last Updated: {datetime.now().strftime('%I:%M %p')}")
+    with col2:
+        if st.button("🔄 Refresh"): st.rerun()
 
-    stages, published = fetch_all_data()
+    stages, published = fetch_data()
     if not stages:
-        st.error("Connection Interrupted: Ensure access to the ulsavam server is active.")
+        st.error("⚠️ Unable to connect to the festival server. Please try again later.")
         return
 
-    # Process Metrics and Logic
-    audit_results = []
-    full_data_list = []
-    summary = {"live": 0, "fin": 0, "total_p": 0, "done_p": 0}
+    # --- PROCESS DATA ---
     now = datetime.now()
+    summary = {"live": 0, "fin": 0, "total_p": 0, "done_p": 0}
+    full_data = []
+    alerts = []
 
     for s in stages:
-        e, w = [], []
+        # Extract basic info
         is_live = s.get("isLive")
         code = str(s.get("item_code", ""))
-        total, done = s.get("participants", 0), s.get("completed", 0)
+        item_name = s.get("item_name", "Unknown Item")
+        total = s.get("participants", 0)
+        done = s.get("completed", 0)
         rem = total - done
         is_fin = s.get("is_tabulation_finish") == "Y"
         tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
         
-        # Summary Counters
+        # Calculate Logic
+        late_mins = int((now - tent).total_seconds() / 60)
+        status_text = "Live Now 🔴" if is_live else ("Finished ✅" if is_fin else "Waiting ⏸️")
+        
+        # Summary
         if is_live: summary["live"] += 1
         if is_fin: summary["fin"] += 1
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # --- AUDIT LOGIC (All Features Preserved) ---
-        if is_live and code in published: e.append(f"PUBLISH CONFLICT: Item {code} published at {published[code]}")
-        if rem <= 0 and is_live: e.append("ZOMBIE LIVE: Item finished but stage still Live")
-        if rem > 0:
-            if not is_live: e.append(f"STALLED: {rem} participants pending")
-            if is_fin: e.append(f"TABULATION: Finished flag ON with {rem} pending")
-        
-        late_mins = int((now - tent).total_seconds() / 60)
-        if is_live and late_mins > 0:
-            if late_mins > GRACE_PERIOD: e.append(f"OVERDUE: Running {late_mins}m behind")
-            else: w.append(f"LAGGING: {late_mins}m behind")
+        # Check for Issues (Logic Engine)
+        issues = []
+        if is_live and code in published: issues.append("⚠️ Results published, but stage shows Live.")
+        if rem <= 0 and is_live: issues.append("⚠️ Stage is Live, but no participants left.")
+        if rem > 0 and not is_live: issues.append("⚠️ Stage paused, participants waiting.")
+        if is_live and late_mins > GRACE_PERIOD: issues.append(f"⏰ Running {late_mins} min late.")
 
-        if e or w:
-            audit_results.append({"Stage": s['name'], "Errors": e, "Warnings": w, "Status": "🔴 Error" if e else "🟡 Warning"})
+        if issues:
+            alerts.append({"stage": s['name'], "loc": s['location'], "issues": issues})
 
-        # --- BUILD DATAFRAME ---
-        full_data_list.append({
+        # Add to table
+        full_data.append({
             "Stage": s['name'],
-            "Location": s['location'],
-            "Item": f"[{code}] {s['item_name']}",
-            "📡 Live": is_live,
-            "👥 Rem": rem,
-            "🕒 Ends": tent,
-            "⌛ Lag (m)": late_mins if late_mins > 0 else 0,
-            "✅ Fin": is_fin
+            "Item": f"{item_name}",
+            "Status": status_text,
+            "Remaining": rem,
+            "Expected End": tent.strftime("%I:%M %p"),
+            "Delay (min)": max(0, late_mins) if is_live else 0,
+            "Search_Key": f"{s['name']} {item_name} {code}".lower() # Hidden column for searching
         })
 
-    # --- TOP ROW: KPI CARDS ---
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("📡 Live Venues", summary["live"])
-    c2.metric("🏆 Results Tabulated", summary["fin"])
-    prog = int((summary["done_p"]/summary["total_p"])*100) if summary["total_p"] > 0 else 0
-    c3.metric("📊 Overall Progress", f"{prog}%", delta=f"{summary['done_p']} / {summary['total_p']}")
-    c4.metric("👥 Total Pending", summary["total_p"] - summary["done_p"])
+    # --- TOP METRICS (Simple & Visual) ---
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("🔴 Stages Live", summary["live"])
+    m2.metric("✅ Items Done", summary["fin"])
+    progress = int((summary["done_p"]/summary["total_p"])*100) if summary["total_p"] > 0 else 0
+    m3.metric("📊 Total Progress", f"{progress}%")
+    m4.metric("👥 Participants Left", summary["total_p"] - summary["done_p"])
 
-    st.write("") # Spacer
-
-    # --- MIDDLE ROW: DISCREPANCIES & CRITICAL TIMELINE ---
-    col_audit, col_time = st.columns([3, 2])
-
-    with col_audit:
-        st.subheader("🚩 Active Discrepancies")
-        if not audit_results:
-            st.success("Clean Audit: Data logic is 100% consistent across all venues.")
-        else:
-            for item in audit_results:
-                with st.expander(f"{item['Status']} | {item['Stage']}"):
-                    for msg in item["Errors"]: st.error(msg, icon="🚨")
-                    for msg in item["Warnings"]: st.warning(msg, icon="🟡")
-
-    with col_time:
-        st.subheader("🕒 Bottleneck Analysis")
-        df_time = pd.DataFrame(full_data_list).sort_values("🕒 Ends", ascending=False)
-        
-        # Configure Table to not scroll inline and be auto-height
-        st.dataframe(
-            df_time[["Stage", "🕒 Ends", "⌛ Lag (m)"]],
-            hide_index=True,
-            use_container_width=True,
-            height=None, # This triggers auto-height in newer Streamlit versions
-            column_config={
-                "🕒 Ends": st.column_config.DatetimeColumn("Expected Finish", format="h:mm a"),
-                "⌛ Lag (m)": st.column_config.NumberColumn("Delay", format="%d min")
-            }
-        )
-        st.info(f"**Closing Venue:** {df_time.iloc[0]['Stage']} at {df_time.iloc[0]['🕒 Ends'].strftime('%I:%M %p')}")
-
-    # --- BOTTOM ROW: FULL INVENTORY (AUTO-HEIGHT) ---
     st.divider()
-    st.subheader("📊 Master Stage Inventory (Real-Time)")
-    
-    df_main = pd.DataFrame(full_data_list)
-    
-    # The height=None or a large height ensures the table is fully visible
+
+    # --- ALERT SECTION (Only shows if problems exist) ---
+    if alerts:
+        with st.expander("⚠️ System Alerts (Click to View)", expanded=True):
+            for alert in alerts:
+                st.warning(f"**{alert['stage']} ({alert['loc']})**: " + " ".join(alert['issues']))
+
+    # --- SEARCH & FILTER ---
+    st.subheader("🔍 Find Your Stage")
+    search_query = st.text_input("", placeholder="Search for Stage (e.g., 'Stage 5') or Item (e.g., 'Mohiniyattam')...").lower()
+
+    # Filter Logic
+    df = pd.DataFrame(full_data)
+    if search_query:
+        df = df[df["Search_Key"].str.contains(search_query)]
+
+    # --- MAIN TABLE (User Friendly) ---
+    # We remove the 'Search_Key' column before displaying
+    display_df = df.drop(columns=["Search_Key"])
+
     st.dataframe(
-        df_main,
+        display_df,
         use_container_width=True,
         hide_index=True,
-        height=int(len(df_main) * 35.5) + 38, # Intelligent height calculation (Row height * count + header)
+        height=int(len(display_df) * 35.5) + 38,
         column_config={
-            "📡 Live": st.column_config.CheckboxColumn("Live Status"),
-            "✅ Fin": st.column_config.CheckboxColumn("Tab. Fin"),
-            "🕒 Ends": st.column_config.DatetimeColumn("End Time", format="h:mm a"),
-            "⌛ Lag (m)": st.column_config.ProgressColumn("Lag", min_value=0, max_value=60, format="%d min"),
-            "👥 Rem": st.column_config.NumberColumn("Remaining"),
-            "Item": st.column_config.TextColumn("Item / Item Code", width="large")
+            "Status": st.column_config.TextColumn("Current Status", width="small"),
+            "Item": st.column_config.TextColumn("Running Item", width="large"),
+            "Remaining": st.column_config.NumberColumn("Pending Ppl", help="Participants yet to perform"),
+            "Delay (min)": st.column_config.ProgressColumn(
+                "Delay", 
+                format="%d min", 
+                min_value=0, 
+                max_value=60,
+                help="How many minutes behind schedule"
+            ),
         }
     )
+
+    if len(df) == 0:
+        st.info("No stages found matching your search.")
 
 if __name__ == "__main__":
     main()
