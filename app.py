@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 
 # --- 1. PAGE SETTINGS ---
 st.set_page_config(
-    page_title="Kalolsavam Live Status", 
-    page_icon="🎭", 
+    page_title="Kalolsavam Live Status",
+    page_icon="🎭",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -30,13 +30,21 @@ st.markdown("""
     }
     h1 { color: #2c3e50; font-size: 2.2rem !important; }
     .element-container .stAlert { border-radius: 10px; }
+    pre.cli-output {
+        background:#0b1220;
+        color:#d6e6ff;
+        padding:12px;
+        border-radius:8px;
+        overflow:auto;
+        font-family:Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. CONFIGURATION ---
 URL_STAGE = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/stage/Stage_management"
 URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publishresult/Public_result/completedItems"
-GRACE_PERIOD = 10 
+GRACE_PERIOD = 10
 SIMILARITY_THRESHOLD = 0.65
 
 # Pre-schedule reference
@@ -72,39 +80,38 @@ def get_schedule_context(stage_name, current_time):
     Returns (current_item, next_item) to handle early starts.
     """
     sched = next((s for s in PRE_SCHEDULE if s["venue"] == stage_name), None)
-    if not sched: return None, None
-    
+    if not sched:
+        return None, None
+
     items = [i.strip() for i in sched["item"].split(",")]
     times = [t.strip() for t in sched["time"].split(",")]
-    
+
     slots = []
     for i in range(len(times)):
         try:
             dt = datetime.strptime(f"{current_time.strftime('%Y-%m-%d')} {times[i].replace(' ', ':')}", "%Y-%m-%d %H:%M")
             slots.append({"item": items[i], "time": dt})
-        except: continue
-        
+        except:
+            continue
+
     slots.sort(key=lambda x: x["time"])
-    
+
     current_item = None
     next_item = None
-    
+
     # Determine current slot
     for i, slot in enumerate(slots):
         if current_time >= slot["time"]:
             current_item = slot["item"]
-            # Look ahead to see what's next
             if i + 1 < len(slots):
                 next_item = slots[i+1]["item"]
             else:
-                next_item = None # Last item of the day
+                next_item = None
         else:
-            # If we haven't reached this slot yet, and haven't found a current,
-            # this is the 'upcoming' first item.
             if current_item is None:
                 next_item = slot["item"]
             break
-            
+
     return current_item, next_item
 
 @st.cache_data(ttl=60)
@@ -112,32 +119,142 @@ def fetch_data():
     try:
         s_res = requests.get(URL_STAGE, timeout=10)
         stages = json.loads(re.search(r"const stages = (\[.*?\]);", s_res.text, re.S).group(1))
+    except Exception:
+        stages = []
+
+    try:
         r_res = requests.get(URL_RESULTS, timeout=10)
         soup = BeautifulSoup(r_res.text, 'html.parser')
-        published = {re.match(r"(\d+)", r.find_all('td')[1].text.strip()).group(1): r.find_all('td')[3].text.strip() 
+        published = {re.match(r"(\d+)", r.find_all('td')[1].text.strip()).group(1): r.find_all('td')[3].text.strip()
                      for r in soup.find_all('tr') if len(r.find_all('td')) > 1}
-        return stages, published
-    except: return [], {}
+    except Exception:
+        published = {}
 
-# --- 5. MAIN APP ---
+    return stages, published
+
+# --- 5. AUDIT ENGINE (same logic/messages as CLI auditor) ---
+def run_audit_and_build_output(stages, published, now):
+    suspicious_list = []
+    time_overview = []
+    summary = {"total_stages": len(stages), "live": 0, "inactive": 0, "fin": 0, "t_p": 0, "t_c": 0}
+
+    for stage in stages:
+        errors = []
+        is_live = stage.get("isLive", False)
+        item_code = str(stage.get("item_code", ""))
+        total, done = stage.get("participants", 0), stage.get("completed", 0)
+        rem = total - done
+        is_finished = stage.get("is_tabulation_finish", "N") == "Y"
+        item_now = stage.get("item_name", "NA")
+
+        # Update Summary
+        if is_live:
+            summary["live"] += 1
+        else:
+            summary["inactive"] += 1
+        if is_finished:
+            summary["fin"] += 1
+        summary["t_p"] += total
+        summary["t_c"] += done
+
+        try:
+            tent_time = datetime.strptime(stage.get("tent_time", ""), "%Y-%m-%d %H:%M:%S")
+            time_overview.append({"name": stage["name"], "time": tent_time, "isLive": is_live, "item": item_now})
+        except:
+            tent_time = now
+
+        curr_sched, next_sched = get_schedule_context(stage.get("name"), now)
+
+        # 1. Result Conflict
+        if is_live and item_code in published:
+            errors.append(f"PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
+
+        # 2. Status & Participant Consistency
+        if done > total:
+            errors.append(f"DATA ERROR: Completed ({done}) > Total ({total}).")
+        if rem <= 0 and is_live:
+            errors.append("LOGIC: Stage LIVE but 0 pending.")
+        if rem > 0:
+            if not is_live:
+                errors.append(f"LOGIC: Stage INACTIVE but {rem} pending.")
+            if is_finished:
+                errors.append(f"LOGIC: Finished Flag ON but {rem} waiting.")
+
+        # 3. Time Validation (grace period logic)
+        if is_live and tent_time < now:
+            late_delta = now - tent_time
+            late_mins = int(late_delta.total_seconds() / 60)
+            if late_mins > GRACE_PERIOD:
+                errors.append(f"TIME CRITICAL: Stage is {late_mins} minutes behind tent_time ({tent_time.strftime('%H:%M')}).")
+            elif late_mins > 0:
+                errors.append(f"TIME WARNING: Stage starting to lag ({late_mins} mins behind).")
+
+        # 4. Item Verification (schedule match)
+        if curr_sched and curr_sched != None:
+            if get_similarity(curr_sched, item_now) < SIMILARITY_THRESHOLD and curr_sched.lower() not in item_now.lower():
+                errors.append(f"MISMATCH: Expected '{curr_sched}', Live shows '{item_now}'.")
+
+        if errors:
+            suspicious_list.append({
+                "name": stage.get("name"),
+                "loc": stage.get("location"),
+                "errors": errors,
+                "rem": rem,
+                "code": item_code
+            })
+
+    # Build textual CLI-style output (same wording as your auditor)
+    lines = []
+    lines.append("\n" + "═" * 75)
+    lines.append(f"  FESTIVAL OVERVIEW | {now.strftime('%H:%M:%S')}")
+    lines.append("─" * 75)
+    lines.append(f"  Stages: {summary['total_stages']} | Live: {summary['live']} | Inactive: {summary['inactive']} | Finished: {summary['fin']}")
+    progress_pct = int((summary['t_c'] / summary['t_p']) * 100) if summary['t_p'] > 0 else 0
+    lines.append(f"  Progress: {summary['t_c']} / {summary['t_p']} ({progress_pct}%)")
+
+    if time_overview:
+        time_overview.sort(key=lambda x: x["time"], reverse=True)
+        latest = time_overview[0]
+        overdue_stages = [s for s in time_overview if s["isLive"] and s["time"] < now]
+        lines.append("─" * 75)
+        lines.append(f"  🕒 LAST STAGE TO FINISH: {latest['name']} at {latest['time'].strftime('%H:%M %p')}")
+        if overdue_stages:
+            lines.append(f"  ⚠️  STAGES RUNNING BEHIND: {len(overdue_stages)} stage(s) have passed their tent_time.")
+
+    lines.append("═" * 75)
+
+    if suspicious_list:
+        lines.append(f"\n  ⚠️ FOUND {len(suspicious_list)} SUSPICIOUS STAGES:")
+        for item in suspicious_list:
+            lines.append(f"\n  🔴 {item['name'].upper()} ({item['loc']}) | Pending: {item['rem']}")
+            for e in item["errors"]:
+                lines.append(f"     └─ ERROR: {e}")
+    else:
+        lines.append("\n  ✅ SYSTEM STATUS: No logical errors found.")
+
+    lines.append("\n" + "═" * 75 + "\n")
+    return "\n".join(lines), suspicious_list, summary
+
+# --- 6. MAIN APP ---
 def main():
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.title("🎭 Kalolsavam Live Status")
+        st.title("Kalolsavam Live Status")
         st.caption(f"Last Updated: {datetime.now().strftime('%I:%M %p')}")
     with col2:
-        if st.button("🔄 Refresh"): st.rerun()
+        if st.button("Refresh"):
+            st.experimental_rerun()
 
     stages, published = fetch_data()
     if not stages:
-        st.error("⚠️ Unable to connect to the festival server. Please try again later.")
+        st.error("Unable to connect to the festival server. Please try again later.")
         return
 
     now = datetime.now()
-    summary = {"live": 0, "fin": 0, "total_p": 0, "done_p": 0}
     full_data = []
     alerts = []
 
+    # Build the data and reuse the same logic for per-stage issues (to populate table & summary)
     for s in stages:
         is_live = s.get("isLive")
         code = str(s.get("item_code", ""))
@@ -146,58 +263,46 @@ def main():
         done = s.get("completed", 0)
         rem = total - done
         is_fin = s.get("is_tabulation_finish") == "Y"
-        
-        try: tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
-        except: tent = now
+
+        try:
+            tent = datetime.strptime(s.get("tent_time"), "%Y-%m-%d %H:%M:%S")
+        except:
+            tent = now
 
         late_mins = int((now - tent).total_seconds() / 60)
-        status_text = "Live Now 🔴" if is_live else ("Finished ✅" if is_fin else "Waiting ⏸️")
-        
-        if is_live: summary["live"] += 1
-        if is_fin: summary["fin"] += 1
-        summary["total_p"] += total
-        summary["done_p"] += done
+        status_text = "Live Now" if is_live else ("Finished" if is_fin else "Waiting")
 
-        # --- LOGIC ENGINE ---
+        # Replicate same issue gathering (keeps streamlit warnings consistent)
         issues = []
-        
-        # 1. Lookahead Schedule Matching
+
         curr_sched, next_sched = get_schedule_context(s['name'], now)
-        
         if is_live and curr_sched:
-            # Check against Current Slot
-            match_curr = get_similarity(curr_sched, item_name) >= SIMILARITY_THRESHOLD or curr_sched.lower() in item_name.lower()
-            # Check against Next Slot (Early Start)
+            match_curr = get_similarity(curr_sched, item_name) >= SIMILARITY_THRESHOLD or (curr_sched.lower() in item_name.lower())
             match_next = False
             if next_sched:
-                match_next = get_similarity(next_sched, item_name) >= SIMILARITY_THRESHOLD or next_sched.lower() in item_name.lower()
-            
-            # If neither matches, flag error
+                match_next = get_similarity(next_sched, item_name) >= SIMILARITY_THRESHOLD or (next_sched.lower() in item_name.lower())
             if not match_curr and not match_next:
                 expect_msg = f"'{curr_sched}'"
-                if next_sched: expect_msg += f" or '{next_sched}'"
-                issues.append(f"🔀 **MISMATCH:** Expected {expect_msg}, Live shows '{item_name}'.")
+                if next_sched:
+                    expect_msg += f" or '{next_sched}'"
+                issues.append(f"🔀 MISMATCH: Expected {expect_msg}, Live shows '{item_name}'.")
 
-        # 2. Inactive but Pending (FIXED Logic)
         if rem > 0 and not is_live:
             if late_mins > 0:
-                issues.append(f"🔴 **CRITICAL:** Stage is OFF but overdue by {late_mins} mins.")
+                issues.append(f"🔴 CRITICAL: Stage is OFF but overdue by {late_mins} mins.")
             elif done > 0:
-                issues.append(f"⏸️ **PAUSED:** {done} finished, stopped with {rem} pending.")
+                issues.append(f"⏸️ PAUSED: {done} finished, stopped with {rem} pending.")
             else:
-                issues.append("⏳ **WAITING:** Item has not started yet.")
+                issues.append("⏳ WAITING: Item has not started yet.")
 
-        # 3. Published Results Conflict
         if is_live and code in published:
-            issues.append(f"🚨 **DATA ERROR:** Results published at {published[code]}, but stage is LIVE.")
+            issues.append(f"🚨 DATA ERROR: Results published at {published[code]}, but stage is LIVE.")
 
-        # 4. Zombie Live Status
         if rem <= 0 and is_live:
-            issues.append("🧟 **STUCK STATUS:** All participants finished, but stage shows Live.")
+            issues.append("🧟 STUCK STATUS: All participants finished, but stage shows Live.")
 
-        # 5. Live Lags
         if is_live and late_mins > GRACE_PERIOD:
-            issues.append(f"⏰ **LAGGING:** Running {late_mins} min behind schedule.")
+            issues.append(f"⏰ LAGGING: Running {late_mins} min behind schedule.")
 
         if issues:
             alerts.append({"stage": s['name'], "loc": s['location'], "issues": issues})
@@ -212,30 +317,37 @@ def main():
             "Search_Key": f"{s['name']} {item_name} {code}".lower()
         })
 
+    # CLI-style audit output (identical wording as your auditor)
+    audit_text, suspicious_list, summary = run_audit_and_build_output(stages, published, now)
+
     # --- METRICS ---
-    if summary["total_p"] > 0:
-        progress = int((summary["done_p"] / summary["total_p"]) * 100)
+    if summary["t_p"] > 0:
+        progress = int((summary["t_c"] / summary["t_p"]) * 100)
     else:
         progress = 0
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("🔴 Stages Live", summary["live"])
-    m2.metric("✅ Items Done", summary["fin"])
-    m3.metric("📊 Total Progress", f"{progress}%")
-    m4.metric("👥 Participants Left", summary["total_p"] - summary["done_p"])
+    m1.metric("Stages Live", summary["live"])
+    m2.metric("Items Done", summary["fin"])
+    m3.metric("Total Progress", f"{progress}%")
+    m4.metric("Participants Left", summary["t_p"] - summary["t_c"])
 
     st.divider()
 
-    # --- ALERTS ---
+    # --- AUDIT OUTPUT (CLI style) ---
+    with st.expander("Audit Output (CLI-style) — view detailed stage errors and system overview", expanded=False):
+        st.markdown(f'<pre class="cli-output">{audit_text}</pre>', unsafe_allow_html=True)
+
+    # --- ALERTS (same as before) ---
     if alerts:
-        with st.expander("⚠️ System Alerts & Delays (Click to View)", expanded=True):
+        with st.expander("System Alerts & Delays (click to view)", expanded=True):
             for alert in alerts:
                 st.warning(f"**{alert['stage']}** ({alert['loc']})\n\n" + "\n".join(alert['issues']))
 
     # --- TABLE ---
-    st.subheader("🔍 Find Your Stage")
+    st.subheader("Find Your Stage")
     search_query = st.text_input("", placeholder="Search Stage (e.g., 'Stage 5') or Item...").lower()
-    
+
     df = pd.DataFrame(full_data)
     if not df.empty:
         if search_query:
