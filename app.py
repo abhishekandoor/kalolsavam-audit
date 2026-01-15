@@ -81,20 +81,26 @@ else:
         summary["total_p"] += total
         summary["done_p"] += done
 
-        # 1. Logic Audit
+        # Logic Audit
         if rem > 0:
             if not is_live:
                 errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} participants are pending.")
             if is_finished:
                 errors.append(f"📉 LOGIC: Marked 'Finished' but {rem} waiting.")
 
-        # 2. Time Audit
+        # Time Audit
         late_mins = 0
         delay_text = "On Time"
+        formatted_end_time = "N/A"
+        
         if tent_time_str:
             try:
+                # Format: 2025-01-15 20:15:00
                 tent_time = datetime.strptime(tent_time_str, "%Y-%m-%d %H:%M:%S")
                 time_tracker.append({"name": name, "item": item_name, "time": tent_time})
+                
+                # Format for table: Day Month, Time (e.g., 15 Jan, 08:15 PM)
+                formatted_end_time = tent_time.strftime("%d %b, %I:%M %p")
                 
                 if rem > 0 and current_now > tent_time:
                     late_mins = int((current_now - tent_time).total_seconds() / 60)
@@ -118,13 +124,13 @@ else:
             "Current Status": "🔴 Live Now" if is_live else ("✅ Finished" if is_finished else "⚪ Waiting"),
             "Participants Waiting": rem,
             "Total Participants": total,
-            "Scheduled End": tent_time_str.split(" ")[1] if " " in tent_time_str else "N/A",
+            "Tentative End Time": formatted_end_time,
             "Delay Status": delay_text
         })
 
     # --- 4. TOP SUMMARY DASHBOARD ---
     st.title("🏛️ Master Audit Command Center")
-    st.info(f"🕒 **Current System Time:** {current_now.strftime('%I:%M:%S %p')} IST | **Data Source:** KITE Kerala Servers")
+    st.info(f"🕒 **Current System Time:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST | **Data Source:** KITE Kerala Servers")
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Stages Currently Live", f"{summary['live']} / {len(live_stages)}")
@@ -135,8 +141,9 @@ else:
 
     if time_tracker:
         last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
-        day_str = "Today" if last_item['time'].date() == current_now.date() else "Tomorrow"
-        st.error(f"🏁 **Projected Final Performance:** {last_item['name']} ({last_item['item']}) at **{last_item['time'].strftime('%I:%M %p')}** ({day_str})")
+        # Use full date for the error banner
+        end_display = last_item['time'].strftime("%d %b, %I:%M %p")
+        st.error(f"🏁 **Projected Final Performance:** {last_item['name']} ({last_item['item']}) at **{end_display}**")
 
     st.divider()
 
@@ -179,7 +186,7 @@ else:
             height=int(table_height),
             column_config={
                 "Delay Status": st.column_config.TextColumn("Delay Info"),
-                "Scheduled End": st.column_config.TextColumn("Tentative End"),
+                "Tentative End Time": st.column_config.TextColumn("Date & End Time"),
                 "Current Status": st.column_config.TextColumn("State"),
                 "Participants Waiting": st.column_config.NumberColumn("Waitlist")
             }
