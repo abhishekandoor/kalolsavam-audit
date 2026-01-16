@@ -70,32 +70,33 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
+# UPDATED: PRE_SCHEDULE now includes 'code' for accurate result auditing
 PRE_SCHEDULE = [
-    {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "time": "09 30, 14 00"},
-    {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "time": "14 00, 09 30"},
-    {"venue": "Stage 3", "item": "Malapulaya Aattam, Malapulaya Aattam", "time": "09 30, 14 00"},
-    {"venue": "Stage 4", "item": "Chavittu Nadakam", "time": "09 30"},
-    {"venue": "Stage 5", "item": "Bharathanatyam (Girls), Mookabhinayam", "time": "09 30, 14 00"},
-    {"venue": "Stage 6", "item": "Nadanpattu, Nadanpattu", "time": "09 30, 14 00"},
-    {"venue": "Stage 7", "item": "Poorakkali (Boys), Groupsong", "time": "09 30, 14 00"},
-    {"venue": "Stage 8", "item": "Nangiar Koothu, Nangiar Koothu", "time": "09 30, 14 00"},
-    {"venue": "Stage 9", "item": "Yakshaganam", "time": "09 30"},
-    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "time": "09 30, 14 00"},
-    {"venue": "Stage 11", "item": "Skit English, Kolkali (Boys)", "time": "09 30, 14 30"},
-    {"venue": "Stage 12", "item": "Kathakali - Group, Kathakali (Girls)", "time": "14 00, 09 30"},
-    {"venue": "Stage 13", "item": "Padyam Chollal - Hindi, Vandematharam, Sangha Ganam, Aksharaslokam", "time": "09 30, 14 00, 15 00, 17 30"},
-    {"venue": "Stage 14", "item": "Mono Act (Boys), Vattappattu (Boys), Mono Act (Girls)", "time": "09 30, 14 00, 11 30"},
-    {"venue": "Stage 15", "item": "Chenda / Thayambaka, Chendamelam", "time": "09 30, 14 00"},
-    {"venue": "Stage 16", "item": "Prasangam (Arabic), Padyam Chollal (Boys), Padyam Chollal(Girls)", "time": "17 00, 15 30, 14 30"},
-    {"venue": "Stage 17", "item": "Prasnothari, Caption Rachana, Nikhandu Nirmanam", "time": "11 30, 14 00, 09 30"},
-    {"venue": "Stage 18", "item": "Thabala, Thabala, Madhalam", "time": "15 00, 12 00, 09 30"},
-    {"venue": "Stage 19", "item": "Padyam Chollal - Arabic, Padyam Chollal - Arabic, Prasangam Arabic", "time": "15 00, 11 30, 09 30"},
-    {"venue": "Stage 20", "item": "Padyam Chollal - Tamil, Prasangam - Tamil, Padyam Chollal - Tamil", "time": "09 30, 14 00, 11 00"},
-    {"venue": "Stage 21", "item": "Chithra Rachana - Oil Colour, Chithra Rachana - Water Colour, Chithra Rachana - Pencil", "time": "15 00, 12 00, 09 30"},
-    {"venue": "Stage 22", "item": "Katharachana - Hindi, Upanyasam - Hindi, Kavitharachana - Hindi", "time": "09 30, 15 00, 12 00"},
-    {"venue": "Stage 23", "item": "Upanyasam - Urdu, Quiz (Urdu), Upanyasam - Urdu", "time": "12 00, 09 30, 15 00"},
-    {"venue": "Stage 24", "item": "Kavitharachana - Tamil, Upanyasam - English, Kavitharachana - English", "time": "09 30, 16 30, 14 30"},
-    {"venue": "Stage 25", "item": "Bandmelam", "time": "09 30"}
+    {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "code": "101, 102", "time": "09 30, 14 00"},
+    {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "code": "103, 104", "time": "14 00, 09 30"},
+    {"venue": "Stage 3", "item": "Malapulaya Aattam, Malapulaya Aattam", "code": "105, 106", "time": "09 30, 14 00"},
+    {"venue": "Stage 4", "item": "Chavittu Nadakam", "code": "107", "time": "09 30"},
+    {"venue": "Stage 5", "item": "Bharathanatyam (Girls), Mookabhinayam", "code": "108, 109", "time": "09 30, 14 00"},
+    {"venue": "Stage 6", "item": "Nadanpattu, Nadanpattu", "code": "110, 111", "time": "09 30, 14 00"},
+    {"venue": "Stage 7", "item": "Poorakkali (Boys), Groupsong", "code": "112, 113", "time": "09 30, 14 00"},
+    {"venue": "Stage 8", "item": "Nangiar Koothu, Nangiar Koothu", "code": "114, 115", "time": "09 30, 14 00"},
+    {"venue": "Stage 9", "item": "Yakshaganam", "code": "116", "time": "09 30"},
+    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "code": "117, 118", "time": "09 30, 14 00"},
+    {"venue": "Stage 11", "item": "Skit English, Kolkali (Boys)", "code": "119, 120", "time": "09 30, 14 30"},
+    {"venue": "Stage 12", "item": "Kathakali - Group, Kathakali (Girls)", "code": "121, 122", "time": "14 00, 09 30"},
+    {"venue": "Stage 13", "item": "Padyam Chollal - Hindi, Vandematharam, Sangha Ganam, Aksharaslokam", "code": "123, 124, 125, 126", "time": "09 30, 14 00, 15 00, 17 30"},
+    {"venue": "Stage 14", "item": "Mono Act (Boys), Vattappattu (Boys), Mono Act (Girls)", "code": "127, 128, 129", "time": "09 30, 14 00, 11 30"},
+    {"venue": "Stage 15", "item": "Chenda / Thayambaka, Chendamelam", "code": "130, 131", "time": "09 30, 14 00"},
+    {"venue": "Stage 16", "item": "Prasangam (Arabic), Padyam Chollal (Boys), Padyam Chollal(Girls)", "code": "132, 133, 134", "time": "17 00, 15 30, 14 30"},
+    {"venue": "Stage 17", "item": "Prasnothari, Caption Rachana, Nikhandu Nirmanam", "code": "135, 136, 137", "time": "11 30, 14 00, 09 30"},
+    {"venue": "Stage 18", "item": "Thabala, Thabala, Madhalam", "code": "138, 139, 140", "time": "15 00, 12 00, 09 30"},
+    {"venue": "Stage 19", "item": "Padyam Chollal - Arabic, Padyam Chollal - Arabic, Prasangam Arabic", "code": "141, 142, 143", "time": "15 00, 11 30, 09 30"},
+    {"venue": "Stage 20", "item": "Padyam Chollal - Tamil, Prasangam - Tamil, Padyam Chollal - Tamil", "code": "144, 145, 146", "time": "09 30, 14 00, 11 00"},
+    {"venue": "Stage 21", "item": "Chithra Rachana - Oil Colour, Chithra Rachana - Water Colour, Chithra Rachana - Pencil", "code": "147, 148, 149", "time": "15 00, 12 00, 09 30"},
+    {"venue": "Stage 22", "item": "Katharachana - Hindi, Upanyasam - Hindi, Kavitharachana - Hindi", "code": "150, 151, 152", "time": "09 30, 15 00, 12 00"},
+    {"venue": "Stage 23", "item": "Upanyasam - Urdu, Quiz (Urdu), Upanyasam - Urdu", "code": "153, 154, 155", "time": "12 00, 09 30, 15 00"},
+    {"venue": "Stage 24", "item": "Kavitharachana - Tamil, Upanyasam - English, Kavitharachana - English", "code": "156, 157, 158", "time": "09 30, 16 30, 14 30"},
+    {"venue": "Stage 25", "item": "Bandmelam", "code": "159", "time": "09 30"}
 ]
 
 # --- 4. UTILITIES ---
@@ -141,7 +142,7 @@ def main():
     stages, published_codes = fetch_all_data()
     
     if not stages:
-        st.error("🚨 Connection Error: Unable to sync with servers.")
+        st.error("🚨 Connection Error: Unable to reach KITE servers.")
         return
 
     suspicious_list, inventory_list, time_tracker = [], [], []
@@ -155,6 +156,8 @@ def main():
         item_now = stage.get("item_name", "NA")
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
+        
+        # Result Audit
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -200,62 +203,50 @@ def main():
             "Competition": item_now,
             "Status": "🟢 Live Now" if is_live else "🔴 Inactive",
             "Result": "✅ Published" if is_published else "⏳ Pending",
-            "Pending Participants": rem,
-            "Total Participants": total,
+            "Pending": rem,
+            "Total": total,
             "Finish": tent_time.strftime("%d %b, %I:%M %p")
         })
         idx += 1
 
-    # --- TOP SUMMARY METRICS ---
+    # --- UI SUMMARY ---
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Active Venues", f"{summary['live']} / {summary['total']}")
-    m2.metric("Total Load", summary['t_p'])
+    m2.metric("Total Participants", summary['t_p'])
     prog = int((summary['t_c']/summary['t_p'])*100) if summary['t_p'] > 0 else 0
     m3.metric("Global Progress", f"{prog}%")
     m4.metric("Pending Performances", summary['t_p'] - summary['t_c'])
 
-    if time_tracker:
-        last_item = sorted(time_tracker, key=lambda x: x['time'], reverse=True)[0]
-        st.error(f"🏁 **Closing Analysis:** {last_item['name']} projected to finish at **{last_item['time'].strftime('%I:%M %p')}**")
-
     st.divider()
 
-    # --- FULL-WIDTH HIGH-PRIORITY SECTION ---
+    # --- HIGH-PRIORITY (FULL WIDTH) ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if not suspicious_list:
         st.success("✅ Clean Audit: All stage logic currently synchronized.")
     else:
-        # Display expanders in a grid-like or single column layout for full width
         for item in suspicious_list:
             with st.expander(f"🔴 {item['name']} : {item['rem']} Pending Participants", expanded=True):
                 c_err, c_loc = st.columns([3, 1])
                 with c_err:
-                    for e in item['errors']:
-                        st.write(f"• {e}")
-                with c_loc:
-                    st.caption(f"**Location:** {item['loc']}")
+                    for e in item['errors']: st.write(f"• {e}")
+                with c_loc: st.caption(f"**Location:** {item['loc']}")
 
     st.divider()
 
-    # --- FULL-WIDTH INVENTORY TABLE ---
+    # --- INVENTORY TABLE ---
     st.subheader("📊 Detailed Stage Inventory")
     df = pd.DataFrame(inventory_list)
-    search_query = st.text_input("🔍 Filter by Stage Name or Item Name:", placeholder="e.g. Stage 5, Oppana...")
+    search_query = st.text_input("🔍 Filter by Stage Name or Item Name:")
     if search_query:
         df = df[df['Stage Name'].str.contains(search_query, case=False) | df['Competition'].str.contains(search_query, case=False)]
     
-    table_height = (len(df) * 35.5) + 45
-    st.dataframe(df, use_container_width=True, hide_index=True, height=int(table_height), column_config={
-        "#": st.column_config.NumberColumn("#", width="small"),
-        "Result": st.column_config.TextColumn("Result Status")
-    })
+    st.dataframe(df, use_container_width=True, hide_index=True, height=int((len(df)*35.5)+45))
 
-    # --- FULL-WIDTH VENUE TIMELINE AT BOTTOM ---
+    # --- UPDATED: FULL-WIDTH VENUE TIMELINE AUDIT (Using Item Code) ---
     st.divider()
-    st.subheader("🕵️ Detailed Venue Timeline Analysis")
-    selected_stage = st.selectbox("🎯 Select a Venue for Deep Audit:", 
-                                 options=["None"] + [s["name"] for s in stages])
+    st.subheader("🕵️ Detailed Venue Timeline & Code-Based Result Audit")
+    selected_stage = st.selectbox("🎯 Select a Venue for Deep Audit:", options=["None"] + [s["name"] for s in stages])
     
     if selected_stage != "None":
         stage_info = next((s for s in stages if s["name"] == selected_stage), None)
@@ -264,33 +255,38 @@ def main():
             with c1:
                 st.markdown(f"#### 🏟️ {selected_stage}")
                 st.write(f"**Venue:** {stage_info.get('location', 'NA')}")
-                st.write(f"**Waitlist:** {int(stage_info.get('participants', 0)) - int(stage_info.get('completed', 0))} performers")
+                st.write(f"**Status:** {'🟢 Live Now' if str(stage_info.get('isLive')).lower() == 'true' else '🔴 Inactive'}")
+            
             with c2:
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
                 if venue_sched:
-                    sched_items = venue_sched["item"].split(",")
-                    sched_times = venue_sched["time"].split(",")
+                    # Parse the updated schedule data
+                    sched_items = [i.strip() for i in venue_sched["item"].split(",")]
+                    sched_codes = [c.strip() for c in venue_sched["code"].split(",")]
+                    sched_times = [t.strip() for t in venue_sched["time"].split(",")]
+                    
                     timeline_rows = []
-                    for s_item, s_time in zip(sched_items, sched_times):
-                        s_item = s_item.strip()
-                        current_item = stage_info.get('item_name', '')
+                    for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times):
+                        # CORE FIX: Check results using item code
+                        is_code_published = s_code in published_codes
                         
-                        # Logic to determine result status for the timeline
-                        if get_similarity(s_item, current_item) > SIMILARITY_THRESHOLD:
+                        live_item_code = str(stage_info.get('item_code', ''))
+                        if live_item_code == s_code:
                             res_status = "🔴 Currently Live"
-                        elif s_time.strip() < current_now.strftime('%H %M'):
-                             res_status = "✅ Result Published"
+                        elif is_code_published:
+                            res_status = "✅ Result Published"
                         else:
-                            res_status = "⏳ Scheduled"
+                            res_status = "⏳ Pending/In Progress"
                         
                         timeline_rows.append({
-                            "Scheduled Time": s_time.strip(),
+                            "Scheduled Time": s_time,
                             "Program": s_item,
-                            "Status": res_status
+                            "Item Code": s_code,
+                            "Audit Status": res_status
                         })
                     st.table(pd.DataFrame(timeline_rows))
                 else:
-                    st.warning("No timeline data found for this venue.")
+                    st.warning("No pre-schedule data (Item Codes) available for this venue.")
 
 if __name__ == "__main__":
     main()
