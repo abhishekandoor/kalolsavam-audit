@@ -155,7 +155,6 @@ def main():
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
-        # Result Status Check
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -171,7 +170,7 @@ def main():
 
         sched_item, is_in_slot = get_scheduled_item(stage["name"], current_now)
 
-        # Audit logic
+        # Updated Audit logic for Mismatch vs Delay
         if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         if rem <= 0 and is_live: errors.append("🧟 LOGIC: Stage LIVE but 0 pending.")
@@ -184,9 +183,13 @@ def main():
             if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
             elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
 
+        # Specific Logic for Inactive vs Live Mismatch
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_now) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_now.lower():
-                errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
+                if is_live:
+                    errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
+                else:
+                    errors.append(f"⏳ STARTUP DELAY: Expected '{sched_item}' to be active, but stage remains Inactive.")
 
         if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
