@@ -14,19 +14,14 @@ st.set_page_config(
 
 IST = pytz.timezone('Asia/Kolkata')
 
-# --- 2. UPDATED HIGH-CONTRAST UI CSS ---
+# --- 2. HIGH-CONTRAST UI CSS ---
 st.markdown("""
     <style>
-    /* Main Background */
     .stApp { background-color: #f8fafc; }
-
-    /* FORCE ALL HEADINGS TO BLACK */
     h1, h2, h3, h4, h5, h6, .main-title {
         color: #000000 !important;
         font-weight: 800 !important;
     }
-
-    /* SUMMARY BOX VISIBILITY */
     [data-testid="stMetric"] {
         background: #ffffff !important;
         padding: 15px 20px;
@@ -38,44 +33,33 @@ st.markdown("""
     [data-testid="stMetricValue"] > div {
         color: #000000 !important;
     }
-
-    /* EXPANDER (ACCORDION) STYLING */
     div[data-testid="stExpander"] {
         border-radius: 12px !important;
         border: 1px solid #e2e8f0 !important;
         background-color: #ffffff !important;
         margin-bottom: 10px;
     }
-
-    /* Expander Header: Solid Black with White Text */
     div[data-testid="stExpander"] summary {
         background-color: #000000 !important; 
         border-radius: 12px 12px 0 0 !important;
         padding: 5px !important;
     }
-
     div[data-testid="stExpander"] summary p {
         color: #ffffff !important;
         font-weight: 700 !important;
     }
-
     div[data-testid="stExpander"] summary svg {
         fill: #ffffff !important;
     }
-    
-    /* Expander Body Text */
     div[data-testid="stExpander"] .stMarkdown, 
     div[data-testid="stExpander"] p, 
     div[data-testid="stExpander"] li {
         color: #000000 !important;
     }
-
-    /* Search Bar and Tables */
     .stTextInput input {
         color: #000000 !important;
         background-color: #ffffff !important;
     }
-
     .block-container { padding-top: 2rem; }
     </style>
 """, unsafe_allow_html=True)
@@ -86,7 +70,7 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule reference from user logic
+# Pre-schedule reference
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "time": "14 00, 09 30"},
@@ -115,7 +99,7 @@ PRE_SCHEDULE = [
     {"venue": "Stage 25", "item": "Bandmelam", "time": "09 30"}
 ]
 
-# --- 3. UTILITY FUNCTIONS ---
+# --- 4. UTILITIES ---
 def get_similarity(a, b):
     return difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
@@ -149,7 +133,7 @@ def fetch_all_data():
         return stages, published
     except: return [], set()
 
-# --- 4. MAIN AUDIT LOGIC ---
+# --- 5. MAIN APP ---
 def main():
     st.markdown('<h1 class="main-title">Kerala State School Kalolsavam Stage Analysis</h1>', unsafe_allow_html=True)
     
@@ -160,7 +144,8 @@ def main():
         st.error("🚨 Connection Error: Unable to sync with official KITE servers.")
         return
 
-    suspicious_list, inventory_list, time_tracker, found_scheduled_items = [], [], [], []
+    suspicious_list, inventory_list, time_tracker = [], [], []
+    # found_scheduled_items = [] # COMMENTED: Used for Schedule Gap Analysis
     summary = {"total": len(stages), "live": 0, "inactive": 0, "fin": 0, "t_p": 0, "t_c": 0}
 
     for stage in stages:
@@ -182,9 +167,9 @@ def main():
         except: tent_time = current_now
 
         sched_item, is_in_slot = get_scheduled_item(stage["name"], current_now)
-        if item_now != "NA": found_scheduled_items.append({"stage": stage["name"], "item": item_now})
+        # if item_now != "NA": found_scheduled_items.append({"stage": stage["name"], "item": item_now}) # COMMENTED
 
-        # Audit logic
+        # --- AUDIT LOGIC ---
         if is_live and item_code in published_codes: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         if rem <= 0 and is_live: errors.append("🧟 LOGIC: Stage LIVE but 0 pending.")
@@ -194,7 +179,7 @@ def main():
         
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind tent_time.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
             elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
 
         if is_in_slot and sched_item:
@@ -213,13 +198,13 @@ def main():
             "Scheduled Finish": tent_time.strftime("%d %b, %I:%M %p")
         })
 
-    # Schedule Gap Analysis
-    missing_items_report = []
-    for sched in PRE_SCHEDULE:
-        expected_item, is_active_now = get_scheduled_item(sched["venue"], current_now)
-        if is_active_now and expected_item:
-            is_present = any(get_similarity(expected_item, f["item"]) > SIMILARITY_THRESHOLD for f in found_scheduled_items if f["stage"] == sched["venue"])
-            if not is_present: missing_items_report.append({"name": sched["venue"], "error": f"❌ GAP: '{expected_item}' should be active per schedule, but is MISSING from server list."})
+    # --- COMMENTED: SCHEDULE GAP ANALYSIS ---
+    # missing_items_report = []
+    # for sched in PRE_SCHEDULE:
+    #     expected_item, is_active_now = get_scheduled_item(sched["venue"], current_now)
+    #     if is_active_now and expected_item:
+    #         is_present = any(get_similarity(expected_item, f["item"]) > SIMILARITY_THRESHOLD for f in found_scheduled_items if f["stage"] == sched["venue"])
+    #         if not is_present: missing_items_report.append({"name": sched["venue"], "error": f"❌ GAP: '{expected_item}' should be active, but is MISSING from server list."})
 
     # --- UI DISPLAY ---
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
@@ -239,9 +224,10 @@ def main():
 
     col_l, col_r = st.columns([1, 2])
     with col_l:
-        st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list) + len(missing_items_report)})")
-        for item in missing_items_report:
-            with st.expander(f"⚠️ {item['name']} | SCHEDULE GAP", expanded=True): st.error(item['error'])
+        st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
+        # for item in missing_items_report: # COMMENTED: UI part for Schedule Gaps
+        #     with st.expander(f"⚠️ {item['name']} | SCHEDULE GAP", expanded=True): st.error(item['error'])
+        if not suspicious_list: st.success("✅ Clean Audit: All stage logic synchronized.")
         for item in suspicious_list:
             with st.expander(f"🔴 {item['name']} ({item['rem']} Pending)", expanded=True):
                 for e in item['errors']: st.write(f"• {e}")
