@@ -221,6 +221,43 @@ def main():
 
     st.divider()
 
+    # --- NEW SECTION: LAST SCHEDULED COMPLETION ANALYSIS ---
+    st.subheader("🏁 Festival Closing Schedule Analysis")
+    all_slots = []
+    for sched in PRE_SCHEDULE:
+        items = [i.strip() for i in sched["item"].split(",")]
+        codes = [c.strip() for c in sched["code"].split(",")]
+        times = [t.strip() for t in sched["time"].split(",")]
+        for i_name, i_code, i_time in zip(items, codes, times):
+            try:
+                dt = datetime.strptime(f"{current_now.strftime('%Y-%m-%d')} {i_time.replace(' ', ':')}", "%Y-%m-%d %H:%M")
+                all_slots.append({
+                    "venue": sched["venue"],
+                    "item": i_name,
+                    "code": i_code,
+                    "time": dt,
+                    "time_str": i_time
+                })
+            except: continue
+
+    if all_slots:
+        # Identify the program with the latest scheduled time
+        last_program = sorted(all_slots, key=lambda x: x["time"], reverse=True)[0]
+        
+        # Check live status for this specific last venue
+        last_stage_live = next((s for s in inventory_list if s["Stage Name"] == last_program["venue"]), None)
+        status_display = last_stage_live["Status"] if last_stage_live else "Unknown"
+        
+        st.error(f"""
+            **Scheduled Grand Finale:** {last_program['item']} (Code: {last_program['code']})  
+            **Venue:** {last_program['venue']} | **Closing Time:** {last_program['time'].strftime('%d %b, %I:%M %p')}  
+            **Current Venue Status:** {status_display}
+        """)
+    else:
+        st.warning("No schedule data available to analyze festival closing.")
+
+    st.divider()
+
     # --- MAIN INVENTORY TABLE ---
     st.subheader("📊 Detailed Stage Inventory")
     df_inv = pd.DataFrame(inventory_list)
@@ -229,7 +266,7 @@ def main():
         df_inv = df_inv[df_inv['Stage Name'].str.contains(search, case=False) | df_inv['Competition'].str.contains(search, case=False)]
     st.dataframe(df_inv, use_container_width=True, hide_index=True, height=int((len(df_inv)*35.5)+45))
 
-    # --- VENUE TIMELINE (Clean Version - No Audit Status) ---
+    # --- VENUE TIMELINE (Clean Version) ---
     st.divider()
     st.subheader("🕵️ Detailed Venue Timeline Analysis")
     selected_stage = st.selectbox("🎯 Select Venue:", options=["None"] + [s["name"] for s in stages])
