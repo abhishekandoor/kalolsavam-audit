@@ -150,7 +150,8 @@ def main():
     for stage in stages:
         errors = []
         is_live = str(stage.get("isLive")).lower() == "true" or stage.get("isLive") is True
-        item_code, item_now = str(stage.get("item_code", "")), stage.get("item_name", "NA")
+        item_code = str(stage.get("item_code", ""))
+        item_now = stage.get("item_name", "NA")
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
@@ -192,7 +193,7 @@ def main():
         inventory_list.append({
             "#": idx,
             "Stage Name": stage["name"],
-            "Venue Location": stage.get("location", "NA"),
+            "Item Code": item_code,
             "Competition": item_now,
             "Status": "🟢 Live Now" if is_live else "🔴 Inactive",
             "Result": "✅ Published" if is_published else "⏳ Pending",
@@ -237,6 +238,7 @@ def main():
         full_table_height = (len(df) * 35.5) + 45
         st.dataframe(df, use_container_width=True, hide_index=True, height=int(full_table_height), column_config={
             "#": st.column_config.NumberColumn("#", width="small"),
+            "Item Code": st.column_config.TextColumn("Item Code", width="small"),
             "Result": st.column_config.TextColumn("Result Status")
         })
 
