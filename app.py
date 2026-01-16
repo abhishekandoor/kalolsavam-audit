@@ -7,7 +7,7 @@ import pytz
 # --- 1. PAGE CONFIG & THEME ---
 st.set_page_config(
     page_title="Kalolsavam Audit Control Room",
-    page_icon="🎭",
+    page_icon="🎭", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -70,6 +70,7 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
+# Pre-schedule reference
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "code": "101, 102", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "code": "103, 104", "time": "14 00, 09 30"},
@@ -139,10 +140,10 @@ def main():
     stages, published_codes = fetch_all_data()
     
     if not stages:
-        st.error("🚨 Connection Error: KITE servers unreachable.")
+        st.error("🚨 Connection Error: Unable to reach KITE servers.")
         return
 
-    suspicious_list, inventory_list = [], []
+    suspicious_list, inventory_list, live_completion_tracker = [], [], []
     summary = {"total": len(stages), "live": 0, "inactive": 0, "fin": 0, "t_p": 0, "t_c": 0}
 
     idx = 1
@@ -152,8 +153,8 @@ def main():
         item_code = str(stage.get("item_code", ""))
         item_now = stage.get("item_name", "NA")
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
-        rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
-        
+        rem = total - done
+        is_finished = str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -162,8 +163,16 @@ def main():
         summary["t_p"] += total
         summary["t_c"] += done
 
+        # TIME LOGIC: Use tent_time from server to find absolute last expected completion
         try:
             tent_time = datetime.strptime(stage.get("tent_time", ""), "%Y-%m-%d %H:%M:%S")
+            live_completion_tracker.append({
+                "venue": stage["name"],
+                "item": item_now,
+                "code": item_code,
+                "time": tent_time,
+                "status": "🟢 Live" if is_live else "🔴 Inactive"
+            })
         except: tent_time = current_now
 
         sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
@@ -209,6 +218,23 @@ def main():
 
     st.divider()
 
+    # --- NEW: TODAY'S LAST PROGRAMME (BASED ON TENT_TIME) ---
+    st.subheader("🏁 Today's Last Programme")
+    if live_completion_tracker:
+        # Filter for items that aren't finished yet and find the latest tent_time
+        expected_last = sorted(live_completion_tracker, key=lambda x: x["time"], reverse=True)[0]
+        
+        st.error(f"""
+            ### 🕒 Expected Conclusion: {expected_last['time'].strftime('%d %b, %I:%M %p')}  
+            **Venue:** {expected_last['venue']} | **Current Item:** {expected_last['item']} (Code: {expected_last['code']})  
+            **Status:** {expected_last['status']}  
+            *Note: This is the absolute latest expected completion based on live tent_time data.*
+        """)
+    else:
+        st.warning("Live tentative completion data currently unavailable.")
+
+    st.divider()
+
     # --- HIGH-PRIORITY (FULL WIDTH) ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if suspicious_list:
@@ -221,52 +247,15 @@ def main():
 
     st.divider()
 
-    # --- NEW SECTION: LAST SCHEDULED COMPLETION ANALYSIS ---
-    st.subheader("🏁 Festival Closing Schedule Analysis")
-    all_slots = []
-    for sched in PRE_SCHEDULE:
-        items = [i.strip() for i in sched["item"].split(",")]
-        codes = [c.strip() for c in sched["code"].split(",")]
-        times = [t.strip() for t in sched["time"].split(",")]
-        for i_name, i_code, i_time in zip(items, codes, times):
-            try:
-                dt = datetime.strptime(f"{current_now.strftime('%Y-%m-%d')} {i_time.replace(' ', ':')}", "%Y-%m-%d %H:%M")
-                all_slots.append({
-                    "venue": sched["venue"],
-                    "item": i_name,
-                    "code": i_code,
-                    "time": dt,
-                    "time_str": i_time
-                })
-            except: continue
-
-    if all_slots:
-        # Identify the program with the latest scheduled time
-        last_program = sorted(all_slots, key=lambda x: x["time"], reverse=True)[0]
-        
-        # Check live status for this specific last venue
-        last_stage_live = next((s for s in inventory_list if s["Stage Name"] == last_program["venue"]), None)
-        status_display = last_stage_live["Status"] if last_stage_live else "Unknown"
-        
-        st.error(f"""
-            **Scheduled Grand Finale:** {last_program['item']} (Code: {last_program['code']})  
-            **Venue:** {last_program['venue']} | **Closing Time:** {last_program['time'].strftime('%d %b, %I:%M %p')}  
-            **Current Venue Status:** {status_display}
-        """)
-    else:
-        st.warning("No schedule data available to analyze festival closing.")
-
-    st.divider()
-
     # --- MAIN INVENTORY TABLE ---
     st.subheader("📊 Detailed Stage Inventory")
     df_inv = pd.DataFrame(inventory_list)
-    search = st.text_input("🔍 Search Venue or Item:")
+    search = st.text_input("🔍 Search Venue or Item Name:")
     if search:
         df_inv = df_inv[df_inv['Stage Name'].str.contains(search, case=False) | df_inv['Competition'].str.contains(search, case=False)]
     st.dataframe(df_inv, use_container_width=True, hide_index=True, height=int((len(df_inv)*35.5)+45))
 
-    # --- VENUE TIMELINE (Clean Version) ---
+    # --- VENUE TIMELINE ---
     st.divider()
     st.subheader("🕵️ Detailed Venue Timeline Analysis")
     selected_stage = st.selectbox("🎯 Select Venue:", options=["None"] + [s["name"] for s in stages])
@@ -286,14 +275,8 @@ def main():
                     sched_items = [i.strip() for i in venue_sched["item"].split(",")]
                     sched_codes = [c.strip() for c in venue_sched["code"].split(",")]
                     sched_times = [t.strip() for t in venue_sched["time"].split(",")]
-                    
-                    timeline_rows = []
-                    for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times):
-                        timeline_rows.append({
-                            "Scheduled Time": s_time,
-                            "Program": s_item,
-                            "Item Code": s_code
-                        })
+                    timeline_rows = [{"Scheduled Time": s_time, "Program": s_item, "Item Code": s_code} 
+                                     for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times)]
                     st.table(pd.DataFrame(timeline_rows))
                 else:
                     st.warning("No pre-schedule codes available for this venue.")
