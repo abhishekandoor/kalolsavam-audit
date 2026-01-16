@@ -70,7 +70,6 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule reference with codes
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "code": "101, 102", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "code": "103, 104", "time": "14 00, 09 30"},
@@ -81,7 +80,7 @@ PRE_SCHEDULE = [
     {"venue": "Stage 7", "item": "Poorakkali (Boys), Groupsong", "code": "112, 113", "time": "09 30, 14 00"},
     {"venue": "Stage 8", "item": "Nangiar Koothu, Nangiar Koothu", "code": "114, 115", "time": "09 30, 14 00"},
     {"venue": "Stage 9", "item": "Yakshaganam", "code": "116", "time": "09 30"},
-    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "code": "937", "time": "09 30, 14 00"}, # Corrected code per image
+    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "code": "937", "time": "09 30, 14 00"},
     {"venue": "Stage 11", "item": "Skit English, Kolkali (Boys)", "code": "698, 120", "time": "09 30, 14 30"},
     {"venue": "Stage 12", "item": "Kathakali - Group, Kathakali (Girls)", "code": "121, 1007", "time": "14 00, 09 30"},
     {"venue": "Stage 13", "item": "Padyam Chollal - Hindi, Vandematharam, Sangha Ganam, Aksharaslokam", "code": "818, 124, 125, 126", "time": "09 30, 14 00, 15 00, 17 30"},
@@ -123,14 +122,12 @@ def fetch_all_data():
         stages = json.loads(match.group(1)) if match else []
         r_res = requests.get(URL_RESULTS, timeout=10)
         soup = BeautifulSoup(r_res.text, 'html.parser')
-        # Robust code extraction
         published = set()
         for row in soup.find_all('tr'):
             cols = row.find_all('td')
             if len(cols) >= 2:
                 code_match = re.search(r"(\d+)", cols[1].text.strip())
-                if code_match:
-                    published.add(code_match.group(1))
+                if code_match: published.add(code_match.group(1))
         return stages, published
     except: return [], set()
 
@@ -145,7 +142,7 @@ def main():
         st.error("🚨 Connection Error: KITE servers unreachable.")
         return
 
-    suspicious_list, inventory_list, time_tracker = [], [], []
+    suspicious_list, inventory_list = [], []
     summary = {"total": len(stages), "live": 0, "inactive": 0, "fin": 0, "t_p": 0, "t_c": 0}
 
     idx = 1
@@ -155,10 +152,8 @@ def main():
         item_code = str(stage.get("item_code", ""))
         item_now = stage.get("item_name", "NA")
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
-        rem = total - done
-        is_finished = str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
+        rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
-        # UNIFIED RESULT AUDIT
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -169,14 +164,12 @@ def main():
 
         try:
             tent_time = datetime.strptime(stage.get("tent_time", ""), "%Y-%m-%d %H:%M:%S")
-            time_tracker.append({"name": stage["name"], "time": tent_time, "isLive": is_live, "item": item_now})
         except: tent_time = current_now
 
         sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
 
         # Audit Logic
-        if is_live and is_published: 
-            errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
+        if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         if rem > 0:
             if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
@@ -216,7 +209,7 @@ def main():
 
     st.divider()
 
-    # --- FULL-WIDTH HIGH-PRIORITY SECTION ---
+    # --- HIGH-PRIORITY (FULL WIDTH) ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if suspicious_list:
         for item in suspicious_list:
@@ -236,7 +229,7 @@ def main():
         df_inv = df_inv[df_inv['Stage Name'].str.contains(search, case=False) | df_inv['Competition'].str.contains(search, case=False)]
     st.dataframe(df_inv, use_container_width=True, hide_index=True, height=int((len(df_inv)*35.5)+45))
 
-    # --- FIX: SYNCHRONIZED VENUE TIMELINE ---
+    # --- VENUE TIMELINE (Clean Version - No Audit Status) ---
     st.divider()
     st.subheader("🕵️ Detailed Venue Timeline Analysis")
     selected_stage = st.selectbox("🎯 Select Venue:", options=["None"] + [s["name"] for s in stages])
@@ -259,24 +252,10 @@ def main():
                     
                     timeline_rows = []
                     for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times):
-                        # UNIFIED AUDIT LOGIC
-                        # 1. Check published result set using item code
-                        # 2. Check if code is currently live
-                        is_code_published = s_code in published_codes
-                        live_item_code = str(stage_info.get('item_code', ''))
-                        
-                        if live_item_code == s_code:
-                            res_status = "🔴 Currently Live"
-                        elif is_code_published:
-                            res_status = "✅ Published"
-                        else:
-                            res_status = "⏳ Pending/In Progress"
-                        
                         timeline_rows.append({
                             "Scheduled Time": s_time,
                             "Program": s_item,
-                            "Item Code": s_code,
-                            "Audit Status": res_status
+                            "Item Code": s_code
                         })
                     st.table(pd.DataFrame(timeline_rows))
                 else:
