@@ -70,7 +70,7 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# UPDATED: PRE_SCHEDULE now includes 'code' for accurate result auditing
+# Ensure 'code' values match official KITE item codes for accurate auditing
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "code": "101, 102", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "code": "103, 104", "time": "14 00, 09 30"},
@@ -142,7 +142,7 @@ def main():
     stages, published_codes = fetch_all_data()
     
     if not stages:
-        st.error("🚨 Connection Error: Unable to reach KITE servers.")
+        st.error("🚨 Connection Error: Unable to sync with official KITE servers.")
         return
 
     suspicious_list, inventory_list, time_tracker = [], [], []
@@ -157,7 +157,6 @@ def main():
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
-        # Result Audit
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -183,7 +182,7 @@ def main():
         
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind tent_time.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
             elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
 
         if is_in_slot and sched_item:
@@ -220,7 +219,7 @@ def main():
 
     st.divider()
 
-    # --- HIGH-PRIORITY (FULL WIDTH) ---
+    # --- HIGH-PRIORITY DISCREPANCIES ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if not suspicious_list:
         st.success("✅ Clean Audit: All stage logic currently synchronized.")
@@ -243,7 +242,7 @@ def main():
     
     st.dataframe(df, use_container_width=True, hide_index=True, height=int((len(df)*35.5)+45))
 
-    # --- UPDATED: FULL-WIDTH VENUE TIMELINE AUDIT (Using Item Code) ---
+    # --- SYNCHRONIZED CODE-BASED AUDIT TIMELINE ---
     st.divider()
     st.subheader("🕵️ Detailed Venue Timeline & Code-Based Result Audit")
     selected_stage = st.selectbox("🎯 Select a Venue for Deep Audit:", options=["None"] + [s["name"] for s in stages])
@@ -260,14 +259,13 @@ def main():
             with c2:
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
                 if venue_sched:
-                    # Parse the updated schedule data
                     sched_items = [i.strip() for i in venue_sched["item"].split(",")]
                     sched_codes = [c.strip() for c in venue_sched["code"].split(",")]
                     sched_times = [t.strip() for t in venue_sched["time"].split(",")]
                     
                     timeline_rows = []
                     for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times):
-                        # CORE FIX: Check results using item code
+                        # FIX: Audit strictly against published_codes using the item code
                         is_code_published = s_code in published_codes
                         
                         live_item_code = str(stage_info.get('item_code', ''))
