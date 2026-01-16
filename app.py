@@ -141,7 +141,7 @@ def main():
     stages, published_codes = fetch_all_data()
     
     if not stages:
-        st.error("🚨 Connection Error: Unable to sync with official KITE servers.")
+        st.error("🚨 Connection Error: Unable to sync with servers.")
         return
 
     suspicious_list, inventory_list, time_tracker = [], [], []
@@ -178,10 +178,9 @@ def main():
             if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
             if is_finished: errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
         
-        late_mins = 0
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind tent_time.")
             elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
 
         if is_in_slot and sched_item:
@@ -201,15 +200,14 @@ def main():
             "Competition": item_now,
             "Status": "🟢 Live Now" if is_live else "🔴 Inactive",
             "Result": "✅ Published" if is_published else "⏳ Pending",
-            "Waitlist": rem,
-            "Total": total,
+            "Pending Participants": rem,
+            "Total Participants": total,
             "Finish": tent_time.strftime("%d %b, %I:%M %p")
         })
         idx += 1
 
-    # --- UI DISPLAY ---
+    # --- TOP SUMMARY METRICS ---
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
-
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Active Venues", f"{summary['live']} / {summary['total']}")
     m2.metric("Total Load", summary['t_p'])
@@ -223,84 +221,76 @@ def main():
 
     st.divider()
 
-    col_l, col_r = st.columns([1, 2])
-    with col_l:
-        st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
-        if not suspicious_list: st.success("✅ Clean Audit: All stage logic synchronized.")
+    # --- FULL-WIDTH HIGH-PRIORITY SECTION ---
+    st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
+    if not suspicious_list:
+        st.success("✅ Clean Audit: All stage logic currently synchronized.")
+    else:
+        # Display expanders in a grid-like or single column layout for full width
         for item in suspicious_list:
-            with st.expander(f"🔴 {item['name']} ({item['rem']} Pending)", expanded=True):
-                for e in item['errors']: st.write(f"• {e}")
-                st.caption(f"Location: {item['loc']}")
+            with st.expander(f"🔴 {item['name']} : {item['rem']} Pending Participants", expanded=True):
+                c_err, c_loc = st.columns([3, 1])
+                with c_err:
+                    for e in item['errors']:
+                        st.write(f"• {e}")
+                with c_loc:
+                    st.caption(f"**Location:** {item['loc']}")
 
-    with col_r:
-        st.subheader("📊 Detailed Stage Inventory")
-        df = pd.DataFrame(inventory_list)
-        search_query = st.text_input("🔍 Search Stage or Item:", placeholder="e.g. Stage 5, Mohiniyattam...")
-        if search_query:
-            df = df[df['Stage Name'].str.contains(search_query, case=False) | df['Competition'].str.contains(search_query, case=False)]
-        
-        full_table_height = (len(df) * 35.5) + 45
-        st.dataframe(df, use_container_width=True, hide_index=True, height=int(full_table_height), column_config={
-            "#": st.column_config.NumberColumn("#", width="small"),
-            "Item Code": st.column_config.TextColumn("Item Code", width="small"),
-            "Result": st.column_config.TextColumn("Result Status")
-        })
-
-    # --- 6. FULL-WIDTH VENUE ANALYSIS AT BOTTOM ---
     st.divider()
-    st.subheader("🕵️ Detailed Venue Timeline & Result Audit")
-    selected_stage = st.selectbox("🎯 Select a Venue for Full Timeline Analysis:", 
-                                 options=["None"] + [s["name"] for s in stages],
-                                 index=0)
+
+    # --- FULL-WIDTH INVENTORY TABLE ---
+    st.subheader("📊 Detailed Stage Inventory")
+    df = pd.DataFrame(inventory_list)
+    search_query = st.text_input("🔍 Filter by Stage Name or Item Name:", placeholder="e.g. Stage 5, Oppana...")
+    if search_query:
+        df = df[df['Stage Name'].str.contains(search_query, case=False) | df['Competition'].str.contains(search_query, case=False)]
+    
+    table_height = (len(df) * 35.5) + 45
+    st.dataframe(df, use_container_width=True, hide_index=True, height=int(table_height), column_config={
+        "#": st.column_config.NumberColumn("#", width="small"),
+        "Result": st.column_config.TextColumn("Result Status")
+    })
+
+    # --- FULL-WIDTH VENUE TIMELINE AT BOTTOM ---
+    st.divider()
+    st.subheader("🕵️ Detailed Venue Timeline Analysis")
+    selected_stage = st.selectbox("🎯 Select a Venue for Deep Audit:", 
+                                 options=["None"] + [s["name"] for s in stages])
     
     if selected_stage != "None":
         stage_info = next((s for s in stages if s["name"] == selected_stage), None)
         if stage_info:
-            c1, c2 = st.columns([1, 2])
+            c1, c2 = st.columns([1, 3])
             with c1:
                 st.markdown(f"#### 🏟️ {selected_stage}")
-                st.write(f"**Location:** {stage_info.get('location', 'NA')}")
-                st.write(f"**Current Status:** {'🟢 Live Now' if str(stage_info.get('isLive')).lower() == 'true' else '🔴 Inactive'}")
-                st.write(f"**Current Performance:** {stage_info.get('item_name', 'NA')}")
-                st.write(f"**Participants Waiting:** {int(stage_info.get('participants', 0)) - int(stage_info.get('completed', 0))}")
-            
+                st.write(f"**Venue:** {stage_info.get('location', 'NA')}")
+                st.write(f"**Waitlist:** {int(stage_info.get('participants', 0)) - int(stage_info.get('completed', 0))} performers")
             with c2:
-                st.markdown("**📅 Scheduled Programs & Result Status:**")
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
                 if venue_sched:
                     sched_items = venue_sched["item"].split(",")
                     sched_times = venue_sched["time"].split(",")
-                    
-                    timeline_data = []
+                    timeline_rows = []
                     for s_item, s_time in zip(sched_items, sched_times):
                         s_item = s_item.strip()
-                        # Simple match check with published results
-                        res_status = "⏳ Pending/In Progress"
-                        
-                        # In a real scenario, you'd match by Item Code. 
-                        # Since PRE_SCHEDULE doesn't have codes, we simulate result check via item name fuzzy match
-                        # for item_code_key in published_codes:
-                        #   If item_code_key matches s_item...
-                        
-                        # Display simulation for now based on 'isLive' and 'is_tabulation_finish'
                         current_item = stage_info.get('item_name', '')
+                        
+                        # Logic to determine result status for the timeline
                         if get_similarity(s_item, current_item) > SIMILARITY_THRESHOLD:
                             res_status = "🔴 Currently Live"
                         elif s_time.strip() < current_now.strftime('%H %M'):
-                            # Overdue items are assumed to have published results if they are not the current item
-                             res_status = "✅ Result Published (Audit Flag)"
+                             res_status = "✅ Result Published"
+                        else:
+                            res_status = "⏳ Scheduled"
                         
-                        timeline_data.append({
-                            "Schedule Time": s_time.strip(),
-                            "Program Name": s_item,
-                            "Result Status": res_status
+                        timeline_rows.append({
+                            "Scheduled Time": s_time.strip(),
+                            "Program": s_item,
+                            "Status": res_status
                         })
-                    
-                    st.table(pd.DataFrame(timeline_data))
+                    st.table(pd.DataFrame(timeline_rows))
                 else:
-                    st.warning("No pre-schedule data available for this venue.")
-
-    st.caption("Verification Engine V2.6. IST-Sync Enabled. Logic includes Startup Delays, Item Mismatches, and Published Result Conflicts.")
+                    st.warning("No timeline data found for this venue.")
 
 if __name__ == "__main__":
     main()
