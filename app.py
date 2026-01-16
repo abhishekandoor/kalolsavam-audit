@@ -104,7 +104,7 @@ def get_similarity(a, b):
 
 def get_scheduled_item(stage_name, current_time):
     sched = next((s for s in PRE_SCHEDULE if s["venue"] == stage_name), None)
-    if not sched: return None, False
+    if not sched: return None, False, None
     items = [i.strip() for i in sched["item"].split(",")]
     times = [t.strip() for t in sched["time"].split(",")]
     slots = []
@@ -114,10 +114,11 @@ def get_scheduled_item(stage_name, current_time):
             slots.append({"item": items[i], "time": dt})
         except: continue
     slots.sort(key=lambda x: x["time"])
-    res_item, in_slot = None, False
+    res_item, in_slot, sched_time = None, False, None
     for slot in slots:
-        if current_time >= slot["time"]: res_item, in_slot = slot["item"], True
-    return res_item, in_slot
+        if current_time >= slot["time"]: 
+            res_item, in_slot, sched_time = slot["item"], True, slot["time"]
+    return res_item, in_slot, sched_time
 
 @st.cache_data(ttl=10)
 def fetch_all_data():
@@ -168,9 +169,9 @@ def main():
             time_tracker.append({"name": stage["name"], "time": tent_time, "isLive": is_live, "item": item_now})
         except: tent_time = current_now
 
-        sched_item, is_in_slot = get_scheduled_item(stage["name"], current_now)
+        sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
 
-        # Updated Audit logic for Mismatch vs Delay
+        # Logic Audit
         if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         if rem <= 0 and is_live: errors.append("🧟 LOGIC: Stage LIVE but 0 pending.")
@@ -178,18 +179,21 @@ def main():
             if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
             if is_finished: errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
         
+        # Time and Delay Logic
+        late_mins = 0
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind tent_time.")
             elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
 
-        # Specific Logic for Inactive vs Live Mismatch
+        # Updated Mismatch and Startup Delay Logic with Time Calculation
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_now) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_now.lower():
                 if is_live:
                     errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
                 else:
-                    errors.append(f"⏳ STARTUP DELAY: Expected '{sched_item}' to be active, but stage remains Inactive.")
+                    delay_from_sched = int((current_now - sched_time_dt).total_seconds() / 60)
+                    errors.append(f"⏳ STARTUP DELAY: Expected '{sched_item}' ({delay_from_sched} mins overdue from schedule).")
 
         if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
