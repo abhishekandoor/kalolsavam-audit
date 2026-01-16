@@ -70,7 +70,6 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule reference
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "time": "14 00, 09 30"},
@@ -145,9 +144,9 @@ def main():
         return
 
     suspicious_list, inventory_list, time_tracker = [], [], []
-    # found_scheduled_items = [] # COMMENTED: Used for Schedule Gap Analysis
     summary = {"total": len(stages), "live": 0, "inactive": 0, "fin": 0, "t_p": 0, "t_c": 0}
 
+    idx = 1
     for stage in stages:
         errors = []
         is_live = str(stage.get("isLive")).lower() == "true" or stage.get("isLive") is True
@@ -155,6 +154,9 @@ def main():
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
         rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
+        # Result Status Check
+        is_published = item_code in published_codes
+
         if is_live: summary["live"] += 1
         else: summary["inactive"] += 1
         if is_finished: summary["fin"] += 1
@@ -167,10 +169,9 @@ def main():
         except: tent_time = current_now
 
         sched_item, is_in_slot = get_scheduled_item(stage["name"], current_now)
-        # if item_now != "NA": found_scheduled_items.append({"stage": stage["name"], "item": item_now}) # COMMENTED
 
-        # --- AUDIT LOGIC ---
-        if is_live and item_code in published_codes: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
+        # Audit logic
+        if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         if rem <= 0 and is_live: errors.append("🧟 LOGIC: Stage LIVE but 0 pending.")
         if rem > 0:
@@ -189,22 +190,17 @@ def main():
         if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
         inventory_list.append({
+            "#": idx,
             "Stage Name": stage["name"],
             "Venue Location": stage.get("location", "NA"),
             "Competition": item_now,
-            "Stage Status": "🟢 Live Now" if is_live else "🔴 Inactive",
-            "Pending Participants": rem,
-            "Total Participants": total,
-            "Scheduled Finish": tent_time.strftime("%d %b, %I:%M %p")
+            "Status": "🟢 Live Now" if is_live else "🔴 Inactive",
+            "Result": "✅ Published" if is_published else "⏳ Pending",
+            "Waitlist": rem,
+            "Total": total,
+            "Finish": tent_time.strftime("%d %b, %I:%M %p")
         })
-
-    # --- COMMENTED: SCHEDULE GAP ANALYSIS ---
-    # missing_items_report = []
-    # for sched in PRE_SCHEDULE:
-    #     expected_item, is_active_now = get_scheduled_item(sched["venue"], current_now)
-    #     if is_active_now and expected_item:
-    #         is_present = any(get_similarity(expected_item, f["item"]) > SIMILARITY_THRESHOLD for f in found_scheduled_items if f["stage"] == sched["venue"])
-    #         if not is_present: missing_items_report.append({"name": sched["venue"], "error": f"❌ GAP: '{expected_item}' should be active, but is MISSING from server list."})
+        idx += 1
 
     # --- UI DISPLAY ---
     st.info(f"🕒 **System Sync:** {current_now.strftime('%d %b, %I:%M:%S %p')} IST")
@@ -225,8 +221,6 @@ def main():
     col_l, col_r = st.columns([1, 2])
     with col_l:
         st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
-        # for item in missing_items_report: # COMMENTED: UI part for Schedule Gaps
-        #     with st.expander(f"⚠️ {item['name']} | SCHEDULE GAP", expanded=True): st.error(item['error'])
         if not suspicious_list: st.success("✅ Clean Audit: All stage logic synchronized.")
         for item in suspicious_list:
             with st.expander(f"🔴 {item['name']} ({item['rem']} Pending)", expanded=True):
@@ -241,7 +235,10 @@ def main():
             df = df[df['Stage Name'].str.contains(search_query, case=False) | df['Competition'].str.contains(search_query, case=False)]
         
         full_table_height = (len(df) * 35.5) + 45
-        st.dataframe(df, use_container_width=True, hide_index=True, height=int(full_table_height))
+        st.dataframe(df, use_container_width=True, hide_index=True, height=int(full_table_height), column_config={
+            "#": st.column_config.NumberColumn("#", width="small"),
+            "Result": st.column_config.TextColumn("Result Status")
+        })
 
 if __name__ == "__main__":
     main()
