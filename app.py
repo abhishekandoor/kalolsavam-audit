@@ -163,7 +163,7 @@ def main():
         summary["t_p"] += total
         summary["t_c"] += done
 
-        # TIME LOGIC: Use tent_time from server to find absolute last expected completion
+        # TODAY'S LAST PROGRAMME TRACKER: Uses live tent_time
         try:
             tent_time = datetime.strptime(stage.get("tent_time", ""), "%Y-%m-%d %H:%M:%S")
             live_completion_tracker.append({
@@ -177,22 +177,35 @@ def main():
 
         sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
 
-        # Audit Logic
-        if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
-        if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
+        # --- UPDATED AUDIT LOGIC (All issues handled) ---
+        if is_live and is_published: 
+            errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
+        
+        if done > total: 
+            errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
+        
+        # FIX: Ensure 0 participants on a Live stage triggers an error
+        if is_live and rem <= 0:
+            errors.append("🧟 LOGIC: Stage is LIVE but 0 participants are pending (Zombie Stage).")
+            
         if rem > 0:
-            if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
-            if is_finished: errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
+            if not is_live: 
+                errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
+            if is_finished: 
+                errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
         
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind.")
+            if late_mins > GRACE_PERIOD_MINS: 
+                errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind.")
 
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_now) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_now.lower():
-                if is_live: errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
+                if is_live: 
+                    errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
 
-        if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
+        if errors: 
+            suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
         inventory_list.append({
             "#": idx,
@@ -218,24 +231,21 @@ def main():
 
     st.divider()
 
-    # --- NEW: TODAY'S LAST PROGRAMME (BASED ON TENT_TIME) ---
+    # --- TODAY'S LAST PROGRAMME ---
     st.subheader("🏁 Today's Last Programme")
     if live_completion_tracker:
-        # Filter for items that aren't finished yet and find the latest tent_time
         expected_last = sorted(live_completion_tracker, key=lambda x: x["time"], reverse=True)[0]
-        
         st.error(f"""
             ### 🕒 Expected Conclusion: {expected_last['time'].strftime('%d %b, %I:%M %p')}  
             **Venue:** {expected_last['venue']} | **Current Item:** {expected_last['item']} (Code: {expected_last['code']})  
-            **Status:** {expected_last['status']}  
-            *Note: This is the absolute latest expected completion based on live tent_time data.*
+            **Status:** {expected_last['status']}
         """)
     else:
-        st.warning("Live tentative completion data currently unavailable.")
+        st.warning("Live tentative completion data unavailable.")
 
     st.divider()
 
-    # --- HIGH-PRIORITY (FULL WIDTH) ---
+    # --- HIGH-PRIORITY DISCREPANCIES ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if suspicious_list:
         for item in suspicious_list:
@@ -272,14 +282,11 @@ def main():
             with c2:
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
                 if venue_sched:
-                    sched_items = [i.strip() for i in venue_sched["item"].split(",")]
-                    sched_codes = [c.strip() for c in venue_sched["code"].split(",")]
-                    sched_times = [t.strip() for t in venue_sched["time"].split(",")]
-                    timeline_rows = [{"Scheduled Time": s_time, "Program": s_item, "Item Code": s_code} 
-                                     for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times)]
+                    sched_items, sched_codes, sched_times = [i.strip() for i in venue_sched["item"].split(",")], [c.strip() for c in venue_sched["code"].split(",")], [t.strip() for t in venue_sched["time"].split(",")]
+                    timeline_rows = [{"Scheduled Time": s_time, "Program": s_item, "Item Code": s_code} for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times)]
                     st.table(pd.DataFrame(timeline_rows))
                 else:
-                    st.warning("No pre-schedule codes available for this venue.")
+                    st.warning("No pre-schedule codes available.")
 
 if __name__ == "__main__":
     main()
