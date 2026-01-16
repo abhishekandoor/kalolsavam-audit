@@ -70,7 +70,7 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# Ensure 'code' values match official KITE item codes for accurate auditing
+# Pre-schedule reference with codes
 PRE_SCHEDULE = [
     {"venue": "Stage 1", "item": "Kuchuppudi (Girls), Thiruvathirakali (Girls)", "code": "101, 102", "time": "09 30, 14 00"},
     {"venue": "Stage 2", "item": "Vrundavadyam, Parichamuttu (Boys)", "code": "103, 104", "time": "14 00, 09 30"},
@@ -81,22 +81,16 @@ PRE_SCHEDULE = [
     {"venue": "Stage 7", "item": "Poorakkali (Boys), Groupsong", "code": "112, 113", "time": "09 30, 14 00"},
     {"venue": "Stage 8", "item": "Nangiar Koothu, Nangiar Koothu", "code": "114, 115", "time": "09 30, 14 00"},
     {"venue": "Stage 9", "item": "Yakshaganam", "code": "116", "time": "09 30"},
-    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "code": "117, 118", "time": "09 30, 14 00"},
-    {"venue": "Stage 11", "item": "Skit English, Kolkali (Boys)", "code": "119, 120", "time": "09 30, 14 30"},
-    {"venue": "Stage 12", "item": "Kathakali - Group, Kathakali (Girls)", "code": "121, 122", "time": "14 00, 09 30"},
-    {"venue": "Stage 13", "item": "Padyam Chollal - Hindi, Vandematharam, Sangha Ganam, Aksharaslokam", "code": "123, 124, 125, 126", "time": "09 30, 14 00, 15 00, 17 30"},
-    {"venue": "Stage 14", "item": "Mono Act (Boys), Vattappattu (Boys), Mono Act (Girls)", "code": "127, 128, 129", "time": "09 30, 14 00, 11 30"},
-    {"venue": "Stage 15", "item": "Chenda / Thayambaka, Chendamelam", "code": "130, 131", "time": "09 30, 14 00"},
-    {"venue": "Stage 16", "item": "Prasangam (Arabic), Padyam Chollal (Boys), Padyam Chollal(Girls)", "code": "132, 133, 134", "time": "17 00, 15 30, 14 30"},
-    {"venue": "Stage 17", "item": "Prasnothari, Caption Rachana, Nikhandu Nirmanam", "code": "135, 136, 137", "time": "11 30, 14 00, 09 30"},
-    {"venue": "Stage 18", "item": "Thabala, Thabala, Madhalam", "code": "138, 139, 140", "time": "15 00, 12 00, 09 30"},
+    {"venue": "Stage 10", "item": "Keralanadanam, Nadodi Nrutham", "code": "937", "time": "09 30, 14 00"}, # Corrected code per image
+    {"venue": "Stage 11", "item": "Skit English, Kolkali (Boys)", "code": "698, 120", "time": "09 30, 14 30"},
+    {"venue": "Stage 12", "item": "Kathakali - Group, Kathakali (Girls)", "code": "121, 1007", "time": "14 00, 09 30"},
+    {"venue": "Stage 13", "item": "Padyam Chollal - Hindi, Vandematharam, Sangha Ganam, Aksharaslokam", "code": "818, 124, 125, 126", "time": "09 30, 14 00, 15 00, 17 30"},
+    {"venue": "Stage 14", "item": "Mono Act (Boys), Vattappattu (Boys), Mono Act (Girls)", "code": "127, 128, 973", "time": "09 30, 14 00, 11 30"},
+    {"venue": "Stage 15", "item": "Chenda / Thayambaka, Chendamelam", "code": "130, 675", "time": "09 30, 14 00"},
+    {"venue": "Stage 18", "item": "Thabala, Thabala, Madhalam", "code": "925, 139, 140", "time": "15 00, 12 00, 09 30"},
     {"venue": "Stage 19", "item": "Padyam Chollal - Arabic, Padyam Chollal - Arabic, Prasangam Arabic", "code": "141, 142, 143", "time": "15 00, 11 30, 09 30"},
-    {"venue": "Stage 20", "item": "Padyam Chollal - Tamil, Prasangam - Tamil, Padyam Chollal - Tamil", "code": "144, 145, 146", "time": "09 30, 14 00, 11 00"},
-    {"venue": "Stage 21", "item": "Chithra Rachana - Oil Colour, Chithra Rachana - Water Colour, Chithra Rachana - Pencil", "code": "147, 148, 149", "time": "15 00, 12 00, 09 30"},
-    {"venue": "Stage 22", "item": "Katharachana - Hindi, Upanyasam - Hindi, Kavitharachana - Hindi", "code": "150, 151, 152", "time": "09 30, 15 00, 12 00"},
-    {"venue": "Stage 23", "item": "Upanyasam - Urdu, Quiz (Urdu), Upanyasam - Urdu", "code": "153, 154, 155", "time": "12 00, 09 30, 15 00"},
-    {"venue": "Stage 24", "item": "Kavitharachana - Tamil, Upanyasam - English, Kavitharachana - English", "code": "156, 157, 158", "time": "09 30, 16 30, 14 30"},
-    {"venue": "Stage 25", "item": "Bandmelam", "code": "159", "time": "09 30"}
+    {"venue": "Stage 20", "item": "Padyam Chollal - Tamil, Prasangam - Tamil, Padyam Chollal - Tamil", "code": "144, 145, 690", "time": "09 30, 14 00, 11 00"},
+    {"venue": "Stage 25", "item": "Bandmelam", "code": "996", "time": "09 30"}
 ]
 
 # --- 4. UTILITIES ---
@@ -121,16 +115,22 @@ def get_scheduled_item(stage_name, current_time):
             res_item, in_slot, sched_time = slot["item"], True, slot["time"]
     return res_item, in_slot, sched_time
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5)
 def fetch_all_data():
     try:
-        s_res = requests.get(URL_STAGE, timeout=15)
+        s_res = requests.get(URL_STAGE, timeout=10)
         match = re.search(r"const\s+stages\s*=\s*(\[.*?\]);", s_res.text, re.DOTALL)
         stages = json.loads(match.group(1)) if match else []
-        r_res = requests.get(URL_RESULTS, timeout=15)
+        r_res = requests.get(URL_RESULTS, timeout=10)
         soup = BeautifulSoup(r_res.text, 'html.parser')
-        published = {re.match(r"(\d+)", r.find_all('td')[1].text.strip()).group(1)
-                     for r in soup.find_all('tr') if len(r.find_all('td')) >= 2 and re.match(r"(\d+)", r.find_all('td')[1].text.strip())}
+        # Robust code extraction
+        published = set()
+        for row in soup.find_all('tr'):
+            cols = row.find_all('td')
+            if len(cols) >= 2:
+                code_match = re.search(r"(\d+)", cols[1].text.strip())
+                if code_match:
+                    published.add(code_match.group(1))
         return stages, published
     except: return [], set()
 
@@ -142,7 +142,7 @@ def main():
     stages, published_codes = fetch_all_data()
     
     if not stages:
-        st.error("🚨 Connection Error: Unable to sync with official KITE servers.")
+        st.error("🚨 Connection Error: KITE servers unreachable.")
         return
 
     suspicious_list, inventory_list, time_tracker = [], [], []
@@ -155,8 +155,10 @@ def main():
         item_code = str(stage.get("item_code", ""))
         item_now = stage.get("item_name", "NA")
         total, done = int(stage.get("participants", 0)), int(stage.get("completed", 0))
-        rem, is_finished = total - done, str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
+        rem = total - done
+        is_finished = str(stage.get("is_tabulation_finish", "N")).upper() == "Y"
         
+        # UNIFIED RESULT AUDIT
         is_published = item_code in published_codes
 
         if is_live: summary["live"] += 1
@@ -172,26 +174,21 @@ def main():
 
         sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
 
-        # Audit logic
-        if is_live and is_published: errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE, but already PUBLISHED.")
+        # Audit Logic
+        if is_live and is_published: 
+            errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
         if done > total: errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
-        if rem <= 0 and is_live: errors.append("🧟 LOGIC: Stage LIVE but 0 pending.")
         if rem > 0:
             if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
             if is_finished: errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
         
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind schedule.")
-            elif late_mins > 0: errors.append(f"🟡 TIME WARNING: Stage starting to lag.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind.")
 
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_now) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_now.lower():
-                if is_live:
-                    errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
-                else:
-                    delay_from_sched = int((current_now - sched_time_dt).total_seconds() / 60)
-                    errors.append(f"⏳ STARTUP DELAY: Expected '{sched_item}' ({delay_from_sched} mins overdue).")
+                if is_live: errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
 
         if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
@@ -219,33 +216,30 @@ def main():
 
     st.divider()
 
-    # --- HIGH-PRIORITY DISCREPANCIES ---
+    # --- FULL-WIDTH HIGH-PRIORITY SECTION ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
-    if not suspicious_list:
-        st.success("✅ Clean Audit: All stage logic currently synchronized.")
-    else:
+    if suspicious_list:
         for item in suspicious_list:
-            with st.expander(f"🔴 {item['name']} : {item['rem']} Pending Participants", expanded=True):
-                c_err, c_loc = st.columns([3, 1])
-                with c_err:
-                    for e in item['errors']: st.write(f"• {e}")
-                with c_loc: st.caption(f"**Location:** {item['loc']}")
+            with st.expander(f"🔴 {item['name']} : {item['rem']} Pending", expanded=True):
+                for e in item['errors']: st.write(f"• {e}")
+                st.caption(f"Location: {item['loc']}")
+    else:
+        st.success("✅ Logic Clean: No discrepancies found.")
 
     st.divider()
 
-    # --- INVENTORY TABLE ---
+    # --- MAIN INVENTORY TABLE ---
     st.subheader("📊 Detailed Stage Inventory")
-    df = pd.DataFrame(inventory_list)
-    search_query = st.text_input("🔍 Filter by Stage Name or Item Name:")
-    if search_query:
-        df = df[df['Stage Name'].str.contains(search_query, case=False) | df['Competition'].str.contains(search_query, case=False)]
-    
-    st.dataframe(df, use_container_width=True, hide_index=True, height=int((len(df)*35.5)+45))
+    df_inv = pd.DataFrame(inventory_list)
+    search = st.text_input("🔍 Search Venue or Item:")
+    if search:
+        df_inv = df_inv[df_inv['Stage Name'].str.contains(search, case=False) | df_inv['Competition'].str.contains(search, case=False)]
+    st.dataframe(df_inv, use_container_width=True, hide_index=True, height=int((len(df_inv)*35.5)+45))
 
-    # --- SYNCHRONIZED CODE-BASED AUDIT TIMELINE ---
+    # --- FIX: SYNCHRONIZED VENUE TIMELINE ---
     st.divider()
-    st.subheader("🕵️ Detailed Venue Timeline & Code-Based Result Audit")
-    selected_stage = st.selectbox("🎯 Select a Venue for Deep Audit:", options=["None"] + [s["name"] for s in stages])
+    st.subheader("🕵️ Detailed Venue Timeline Analysis")
+    selected_stage = st.selectbox("🎯 Select Venue:", options=["None"] + [s["name"] for s in stages])
     
     if selected_stage != "None":
         stage_info = next((s for s in stages if s["name"] == selected_stage), None)
@@ -254,7 +248,7 @@ def main():
             with c1:
                 st.markdown(f"#### 🏟️ {selected_stage}")
                 st.write(f"**Venue:** {stage_info.get('location', 'NA')}")
-                st.write(f"**Status:** {'🟢 Live Now' if str(stage_info.get('isLive')).lower() == 'true' else '🔴 Inactive'}")
+                st.write(f"**Status:** {'🟢 Live' if str(stage_info.get('isLive')).lower() == 'true' else '🔴 Inactive'}")
             
             with c2:
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
@@ -265,14 +259,16 @@ def main():
                     
                     timeline_rows = []
                     for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times):
-                        # FIX: Audit strictly against published_codes using the item code
+                        # UNIFIED AUDIT LOGIC
+                        # 1. Check published result set using item code
+                        # 2. Check if code is currently live
                         is_code_published = s_code in published_codes
-                        
                         live_item_code = str(stage_info.get('item_code', ''))
+                        
                         if live_item_code == s_code:
                             res_status = "🔴 Currently Live"
                         elif is_code_published:
-                            res_status = "✅ Result Published"
+                            res_status = "✅ Published"
                         else:
                             res_status = "⏳ Pending/In Progress"
                         
@@ -284,7 +280,7 @@ def main():
                         })
                     st.table(pd.DataFrame(timeline_rows))
                 else:
-                    st.warning("No pre-schedule data (Item Codes) available for this venue.")
+                    st.warning("No pre-schedule codes available for this venue.")
 
 if __name__ == "__main__":
     main()
