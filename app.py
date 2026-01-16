@@ -102,7 +102,7 @@ current_now = get_now_ist()
 live_stages = fetch_live_data()
 
 if not live_stages:
-    st.error("🚨 Connection Error: Unable to reach KITE servers.")
+    st.error("🚨 No Live Stages available.")
 else:
     suspicious_list = []
     inventory_list = []
