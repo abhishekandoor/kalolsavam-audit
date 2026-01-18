@@ -72,14 +72,14 @@ SIMILARITY_THRESHOLD = 0.65
 
 # UPDATED PRE_SCHEDULE based on Jan 18th data
 PRE_SCHEDULE = [
-    {"venue": "Stage 1", "item": "Nadodi Nrutham (B)", "code": "", "time": "09 00"},
-    {"venue": "Stage 2", "item": "Kuchuppudi (Boys)", "code": "", "time": "09 00"},
-    {"venue": "Stage 3", "item": "Vanchipattu", "code": "", "time": "09 00"},
-    {"venue": "Stage 5", "item": "Groupsong Urdu", "code": "", "time": "09 00"},
-    {"venue": "Stage 8", "item": "Kathakali Sangeetham (Girls)", "code": "", "time": "09 00"},
-    {"venue": "Stage 14", "item": "Sasthreeya Sangeetham(Boys)", "code": "", "time": "09 00"},
-    {"venue": "Stage 15", "item": "Nadaswaram", "code": "", "time": "09 00"},
-    {"venue": "Stage 18", "item": "Violin - Paurasthyam", "code": "", "time": "09 00"}
+    {"venue": "Stage 1", "item": "Nadodi Nrutham (B)", "time": "09 00"},
+    {"venue": "Stage 2", "item": "Kuchuppudi (Boys)", "time": "09 00"},
+    {"venue": "Stage 3", "item": "Vanchipattu",  "time": "09 00"},
+    {"venue": "Stage 5", "item": "Groupsong Urdu", "time": "09 00"},
+    {"venue": "Stage 8", "item": "Kathakali Sangeetham (Girls)","time": "09 00"},
+    {"venue": "Stage 14", "item": "Sasthreeya Sangeetham(Boys)",  "time": "09 00"},
+    {"venue": "Stage 15", "item": "Nadaswaram", "time": "09 00"},
+    {"venue": "Stage 18", "item": "Violin - Paurasthyam", "time": "09 00"}
 ]
 
 # --- 4. UTILITIES ---
