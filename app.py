@@ -70,33 +70,16 @@ URL_RESULTS = "https://ulsavam.kite.kerala.gov.in/2025/kalolsavam/index.php/publ
 GRACE_PERIOD_MINS = 10
 SIMILARITY_THRESHOLD = 0.65
 
-# Pre-schedule reference
+# UPDATED PRE_SCHEDULE based on Jan 18th data
 PRE_SCHEDULE = [
-    {"venue": "Stage 1", "item": "Group Dance (Girls), Bharathanatyam (Girls)", "code": "101, 102", "time": "14 00, 09 30"},
-    {"venue": "Stage 2", "item": "Parichamuttu (Boys), Vrunda Vadyam", "code": "103, 104", "time": "09 30, 14 00"},
-    {"venue": "Stage 3", "item": "Erula Nirtham, Erula Nirtham", "code": "105, 106", "time": "14 00, 09 30"},
-    {"venue": "Stage 4", "item": "Chavittu Nadakam", "code": "107", "time": "09 30"},
-    {"venue": "Stage 5", "item": "Paliya Nirtham, Paliya Nirtham", "code": "108, 109", "time": "14 00, 09 30"},
-    {"venue": "Stage 6", "item": "Mono Act (Boys), Nadodi Nrutham (Girls), Mono Act (Girls)", "code": "110, 111", "time": "11 30, 15 00, 09 30"},
-    {"venue": "Stage 7", "item": "Keralanadanam (Girls), Kolkali (Boys)", "code": "112, 113", "time": "09 30, 14 00"},
-    {"venue": "Stage 8", "item": "Kathakali Sangeetham (Boys), Kathakali Sangeetham (Girls), Kathakali Sangeetham (Boys)", "code": "114, 115", "time": "12 30, 09 30, 15 30"},
-    {"venue": "Stage 9", "item": "Koodiyattam", "code": "116", "time": "09 30"},
-    {"venue": "Stage 10", "item": "Kuchuppudi (Boys), Vanchipattu", "code": "937", "time": "14 00, 09 30"},
-    {"venue": "Stage 11", "item": "Nadakam", "code": "698, 120", "time": "09 30"},
-    {"venue": "Stage 12", "item": "Kathakali , Kathakali (Girls)", "code": "121, 1007", "time": "14 00, 09 30"},
-    {"venue": "Stage 13", "item": "Padakam (Girls), Padakam (Boys), Ganalapanam (Girls), Ganalapanam (Boys)", "code": "818, 124, 125, 126", "time": "12 00, 09 30, 14 00, 16 00"},
-    {"venue": "Stage 14", "item": "Sasthreeya Sangeetham(Boys), Sasthreeya Sangeetham(Girls), Sasthreeya Sangeetham(Girls)", "code": "127, 128, 973", "time": "12 00, 15 00, 09 30"},
-    {"venue": "Stage 15", "item": "Odakkuzhal, Nadaswaram, Odakuzhal, Triple / Jazz - Western", "code": "130, 675", "time": "12 00, 14 00, 09 30, 16 00"},
-    {"venue": "Stage 16", "item": "Nadakam", "code": "", "time": "09 30"},
-    {"venue": "Stage 17", "item": "Tharjama ( Arabic), Poster Nirmanam", "code": "", "time": "09 30, 11 00"},
-    {"venue": "Stage 18", "item": "Violin - Oriental, Violin - Western, Violin - Paschathyam", "code": "925, 139, 140", "time": "14 00, 11 00, 09 30"},
-    {"venue": "Stage 19", "item": "Prasangam - Urdu, Padyam Chollal - Urdu, Padyam Chollal - Urdu, Prasangam Urdu", "code": "141, 142, 143", "time": "15 00, 12 00, 09 30, 17 00"},
-    {"venue": "Stage 20", "item": "Aksharaslokam, Kavyakeli, Aksharaslokam, Kavyakeli", "code": "144, 145, 690", "time": "14 00, 12 00, 16 00, 09 30"},
-    {"venue": "Stage 21", "item": "Katharachana - Urdu, Katharachana - Urdu, Kavitharachana - Urdu, Kavitharachana - Urdu", "code": "", "time": "12 00, 09 30, 14 30, 16 30"},
-    {"venue": "Stage 22", "item": "Upanyasam - Hindi, Kavitharachana - Hindi, Katharachana - Hindi", "code": "", "time": "15 00, 09 30, 12 00"},
-    {"venue": "Stage 23", "item": "Upanyasam - Arabic, Katharachana - Arabic, Kavitharachana - Arabic", "code": "", "time": "15 00, 09 30, 12 00"},
-    {"venue": "Stage 24", "item": "Kavitharachana - Sanskrit, Katharachana - Sanskrit", "code": "", "time": "12 00, 09 30"},
-    {"venue": "Stage 25", "item": "Bandmelam", "code": "996", "time": "09 30"}
+    {"venue": "Stage 1", "item": "Nadodi Nrutham (B)", "code": "", "time": "09 00"},
+    {"venue": "Stage 2", "item": "Kuchuppudi (Boys)", "code": "", "time": "09 00"},
+    {"venue": "Stage 3", "item": "Vanchipattu", "code": "", "time": "09 00"},
+    {"venue": "Stage 5", "item": "Groupsong Urdu", "code": "", "time": "09 00"},
+    {"venue": "Stage 8", "item": "Kathakali Sangeetham (Girls)", "code": "", "time": "09 00"},
+    {"venue": "Stage 14", "item": "Sasthreeya Sangeetham(Boys)", "code": "", "time": "09 00"},
+    {"venue": "Stage 15", "item": "Nadaswaram", "code": "", "time": "09 00"},
+    {"venue": "Stage 18", "item": "Violin - Paurasthyam", "code": "", "time": "09 00"}
 ]
 
 # --- 4. UTILITIES ---
@@ -169,7 +152,7 @@ def main():
         summary["t_p"] += total
         summary["t_c"] += done
 
-        # TODAY'S LAST PROGRAMME TRACKER: Uses live tent_time
+        # TODAY'S LAST PROGRAMME TRACKER: Uses live tent_time from server
         try:
             tent_time = datetime.strptime(stage.get("tent_time", ""), "%Y-%m-%d %H:%M:%S")
             live_completion_tracker.append({
@@ -177,41 +160,35 @@ def main():
                 "item": item_now,
                 "code": item_code,
                 "time": tent_time,
-                "status": "🟢 Live" if is_live else "🔴 Inactive"
+                "status": "🟢 Live Now" if is_live else "🔴 Inactive"
             })
         except: tent_time = current_now
 
         sched_item, is_in_slot, sched_time_dt = get_scheduled_item(stage["name"], current_now)
 
-        # --- UPDATED AUDIT LOGIC (All issues handled) ---
+        # Audit Logic
         if is_live and is_published: 
             errors.append(f"🚨 PUBLISH CONFLICT: Item [{item_code}] is LIVE but Result already PUBLISHED.")
-        
         if done > total: 
             errors.append(f"❌ DATA ERROR: Completed ({done}) > Total ({total}).")
         
-        # FIX: Ensure 0 participants on a Live stage triggers an error
+        # Check for Zombie Stage (Live but no pending participants)
         if is_live and rem <= 0:
             errors.append("🧟 LOGIC: Stage is LIVE but 0 participants are pending (Zombie Stage).")
-            
+
         if rem > 0:
-            if not is_live: 
-                errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
-            if is_finished: 
-                errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
+            if not is_live: errors.append(f"⏸️ LOGIC: Stage INACTIVE but {rem} pending.")
+            if is_finished: errors.append(f"📉 LOGIC: Finished Flag ON but {rem} waiting.")
         
         if is_live and tent_time < current_now:
             late_mins = int((current_now - tent_time).total_seconds() / 60)
-            if late_mins > GRACE_PERIOD_MINS: 
-                errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind.")
+            if late_mins > GRACE_PERIOD_MINS: errors.append(f"⏰ TIME CRITICAL: Running {late_mins} mins behind.")
 
         if is_in_slot and sched_item:
             if get_similarity(sched_item, item_now) < SIMILARITY_THRESHOLD and sched_item.lower() not in item_now.lower():
-                if is_live: 
-                    errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
+                if is_live: errors.append(f"🔀 MISMATCH: Expected '{sched_item}', Live shows '{item_now}'.")
 
-        if errors: 
-            suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
+        if errors: suspicious_list.append({"name": stage["name"], "loc": stage.get("location", "NA"), "errors": errors, "rem": rem})
 
         inventory_list.append({
             "#": idx,
@@ -237,7 +214,7 @@ def main():
 
     st.divider()
 
-    # --- TODAY'S LAST PROGRAMME ---
+    # --- TODAY'S LAST PROGRAMME (BASED ON LIVE TENT_TIME) ---
     st.subheader("🏁 Today's Last Programme")
     if live_completion_tracker:
         expected_last = sorted(live_completion_tracker, key=lambda x: x["time"], reverse=True)[0]
@@ -251,7 +228,7 @@ def main():
 
     st.divider()
 
-    # --- HIGH-PRIORITY DISCREPANCIES ---
+    # --- HIGH-PRIORITY (FULL WIDTH) ---
     st.subheader(f"🚩 High-Priority Discrepancies ({len(suspicious_list)})")
     if suspicious_list:
         for item in suspicious_list:
@@ -259,7 +236,7 @@ def main():
                 for e in item['errors']: st.write(f"• {e}")
                 st.caption(f"Location: {item['loc']}")
     else:
-        st.success("✅ Logic Clean: No discrepancies found.")
+        st.success("✅ Logic Clean: All stage logic currently synchronized.")
 
     st.divider()
 
@@ -284,15 +261,14 @@ def main():
                 st.markdown(f"#### 🏟️ {selected_stage}")
                 st.write(f"**Venue:** {stage_info.get('location', 'NA')}")
                 st.write(f"**Status:** {'🟢 Live' if str(stage_info.get('isLive')).lower() == 'true' else '🔴 Inactive'}")
-            
             with c2:
                 venue_sched = next((s for s in PRE_SCHEDULE if s["venue"] == selected_stage), None)
                 if venue_sched:
-                    sched_items, sched_codes, sched_times = [i.strip() for i in venue_sched["item"].split(",")], [c.strip() for c in venue_sched["code"].split(",")], [t.strip() for t in venue_sched["time"].split(",")]
-                    timeline_rows = [{"Scheduled Time": s_time, "Program": s_item, "Item Code": s_code} for s_item, s_code, s_time in zip(sched_items, sched_codes, sched_times)]
+                    sched_items, sched_times = [i.strip() for i in venue_sched["item"].split(",")], [t.strip() for t in venue_sched["time"].split(",")]
+                    timeline_rows = [{"Scheduled Time": s_time, "Program": s_item} for s_item, s_time in zip(sched_items, sched_times)]
                     st.table(pd.DataFrame(timeline_rows))
                 else:
-                    st.warning("No pre-schedule codes available.")
+                    st.warning("No pre-schedule codes available for this venue.")
 
 if __name__ == "__main__":
     main()
